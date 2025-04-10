@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+.vscode/
+
+#macOS
+.DS_Store
+
+# Frontend
+node_modules/
+
+# Backend
+backend/db
+PLANS.md
