@@ -6,7 +6,6 @@ import os
 import sys
 import argparse
 import re
-import json
 from urllib.parse import urlparse
 from pathlib import Path
 from typing import List, Optional, Any  # Added Any
@@ -226,7 +225,7 @@ async def main(args):
     # --- End Configurations ---
 
     console.print(
-        f"[cyan][INFO] Starting crawl for {len(urls_to_scrape)} URLs (HTML fetch pass)...[/cyan]"
+        f"[cyan][INFO] Starting crawl for {len(urls_to_scrape)} URLs (sequentially)...[/cyan]"
     )
     success_count = 0
     failed_count = 0
@@ -234,66 +233,53 @@ async def main(args):
     tasks = []
     urls_being_processed = []
 
-    # --- Crawling Loop (Pass 1 - Fetch HTML) ---
     async with AsyncWebCrawler(config=browser_config) as crawler:
-        for url in urls_to_scrape:
-            if url in processed_urls:
-                console.print(f"[yellow][WARN] Skipping duplicate URL:[/yellow] {url}")
-                continue
-            processed_urls.add(url)
-            urls_being_processed.append(url)
-            tasks.append(
-                asyncio.create_task(
-                    crawler.arun(url=url, config=html_fetch_config),
-                    name=f"Fetch_{len(urls_being_processed)}_{url[:50]}",
-                )
+        for index, url in enumerate(urls_to_scrape):
+            console.print(
+                f"\n[cyan][INFO] Processing URL {index + 1}/{len(urls_to_scrape)}:[/cyan] {url}"
             )
-
-        if not tasks:
-            console.print("[yellow][WARN] No unique URLs to process. Exiting.[/yellow]")
-            return
-
-        console.print(
-            f"[cyan][INFO] Running {len(tasks)} HTML fetch tasks concurrently...[/cyan]"
-        )
-        html_results_list_of_lists = await asyncio.gather(
-            *tasks, return_exceptions=True
-        )
-        console.print("[cyan][INFO] HTML fetching finished. Starting LLM filtering...")
-
-        # --- Processing Loop (Pass 2 - Filter HTML & Save MD) ---
-        for index, result_or_exception in enumerate(html_results_list_of_lists):
-            url = urls_being_processed[index]
             filepath = None
 
             try:
-                if isinstance(result_or_exception, Exception):
+                # --- Pass 1: Fetch HTML ---
+                console.print(f"  [INFO] Fetching HTML...")
+                result_list = await crawler.arun(
+                    url=url, config=html_fetch_config
+                )  # Use HTML fetch config
+
+                html_to_filter = None
+                if result_list:
+                    result = result_list[0]
+                    if result.success:
+                        html_to_filter = (
+                            result.cleaned_html if result.cleaned_html else result.html
+                        )
+                        if not html_to_filter:
+                            console.print(
+                                f"  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
+                            )
+                    else:
+                        console.print(
+                            f"  [bold red][ERROR] HTML fetch failed: {result.error_message or 'Unknown error'}[/bold red]"
+                        )
+                        failed_count += 1
+                        # Add delay even after failure before next URL
+                        await asyncio.sleep(3.0)  # 3 second delay
+                        continue  # Skip to next URL
+                else:
                     console.print(
-                        f"[bold red][ERROR] HTML fetch task failed for {url}: {result_or_exception}[/bold red]"
+                        f"  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
                     )
                     failed_count += 1
-                    continue
+                    # Add delay even after failure before next URL
+                    await asyncio.sleep(3.0)  # 3 second delay
+                    continue  # Skip to next URL
 
-                result_list = result_or_exception
-                if not result_list:
+                # --- Pass 2: Filter with LLM (if HTML was fetched) ---
+                if html_to_filter:
                     console.print(
-                        f"[yellow][WARN] No result returned from HTML fetch for {url}. Skipping.[/yellow]"
+                        f"  [INFO] HTML fetched ({len(html_to_filter)} chars). Sending to LLM filter..."
                     )
-                    failed_count += 1
-                    continue
-                result = result_list[0]
-
-                # Check if crawl succeeded and HTML exists
-                # Use cleaned_html if available, otherwise raw html
-                html_to_filter = (
-                    result.cleaned_html if result.cleaned_html else result.html
-                )
-
-                if result.success and html_to_filter:
-                    console.print(
-                        f"  [INFO] HTML fetched for {url}. Sending to LLM filter..."
-                    )
-                    # Call the filter helper function
                     filtered_md = await run_llm_filter(
                         filter_instance=llm_content_filter,
                         html_content=html_to_filter,
@@ -311,7 +297,7 @@ async def main(args):
                             success_count += 1
                         except IOError as e:
                             console.print(
-                                f"[bold red][ERROR] Failed to save filtered markdown for {url} to {filepath}: {e}[/bold red]"
+                                f"[bold red][ERROR] Failed to save markdown for {url} to {filepath}: {e}[/bold red]"
                             )
                             failed_count += 1
                     else:
@@ -320,22 +306,32 @@ async def main(args):
                         )
                         failed_count += 1
                 else:
-                    console.print(
-                        f"[bold red][ERROR] Failed to fetch HTML for {url}: {result.error_message or 'No HTML content'}[/bold red]"
-                    )
+                    # Already warned about empty HTML content above
                     failed_count += 1
 
             except Exception as e:
                 console.print(
-                    f"[bold red][CRITICAL] Unexpected error processing result for {url}: {e}[/bold red]"
+                    f"[bold red][CRITICAL] Unexpected error processing {url}: {e}[/bold red]"
                 )
                 failed_count += 1
 
-            # Optional delay between LLM calls if needed
-            # await asyncio.sleep(0.5) # Maybe slightly longer if using LLM heavily
+            # --- IMPORTANT: Delay Between URLs ---
+            # Add a pause to avoid overwhelming the server / getting rate-limited
+            # Adjust the sleep time as needed (3-5 seconds is often a safe start)
+            delay_seconds = 3.0
+            console.print(
+                f"  [INFO] Waiting {delay_seconds} seconds before next URL..."
+            )
+            await asyncio.sleep(delay_seconds)
+            # --- End Delay ---
 
-    # --- End Processing Loop ---
+    # --- End Crawling Loop ---
 
+    console.print(
+        f"\n[bold green]ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}.[/bold green]"
+    )
+
+    # --- Final Duration Log ---
     console.print(
         f"\n[bold green]ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}.[/bold green]"
     )
