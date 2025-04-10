@@ -8,7 +8,7 @@ import argparse
 import re
 from urllib.parse import urlparse
 from pathlib import Path
-from typing import List, Optional, Any  # Added Any
+from typing import List, Optional
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -229,9 +229,9 @@ async def main(args):
     )
     success_count = 0
     failed_count = 0
-    processed_urls = set()
-    tasks = []
-    urls_being_processed = []
+    # processed_urls = set()
+    # tasks = []
+    # urls_being_processed = []
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
         for index, url in enumerate(urls_to_scrape):
@@ -242,7 +242,7 @@ async def main(args):
 
             try:
                 # --- Pass 1: Fetch HTML ---
-                console.print(f"  [INFO] Fetching HTML...")
+                console.print("  [INFO] Fetching HTML...")
                 result_list = await crawler.arun(
                     url=url, config=html_fetch_config
                 )  # Use HTML fetch config
@@ -256,7 +256,7 @@ async def main(args):
                         )
                         if not html_to_filter:
                             console.print(
-                                f"  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
+                                "  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
                             )
                     else:
                         console.print(
@@ -268,7 +268,7 @@ async def main(args):
                         continue  # Skip to next URL
                 else:
                     console.print(
-                        f"  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
+                        "  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
                     )
                     failed_count += 1
                     # Add delay even after failure before next URL
