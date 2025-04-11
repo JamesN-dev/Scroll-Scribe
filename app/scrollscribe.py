@@ -55,7 +55,7 @@ def setup_argparse():
     )
     parser.add_argument(
         "--model",
-        default="openrouter/openrouter/quasar-alpha",
+        default="openrouter/openrouter/optimus-alpha",
         help="LLM model identifier for filtering.",
     )
     parser.add_argument(
