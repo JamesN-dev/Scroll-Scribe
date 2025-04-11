@@ -79,7 +79,7 @@ Use `simple_link_extractor.py` to crawl a documentation homepage or index and ex
 
 **Command Structure:**
 ```bash
-uv run app/simple_link_extractor.py -- <start_url> -o <output_link_file.txt> [-v]
+uv run app/simple_link_extractor.py <start_url> -o <output_link_file.txt> [-v]
 ```
 
 **Arguments:**
@@ -89,7 +89,7 @@ uv run app/simple_link_extractor.py -- <start_url> -o <output_link_file.txt> [-v
 
 **Example:**
 ```bash
-uv run app/simple_link_extractor.py -- https://docs.example.com/ -o data/doc_links.txt -v
+uv run app/simple_link_extractor.py https://docs.example.com/ -o data/doc_links.txt -v
 ```
 
 ---
@@ -100,7 +100,7 @@ Use the main app (`scrollscribe.py`) to process the list of URLs generated in St
 
 **Command Structure:**
 ```bash
-uv run app -- <input_file.txt> [OPTIONS]
+uv run app <input_file.txt> [OPTIONS]
 ```
 
 **Arguments:**
@@ -117,13 +117,13 @@ uv run app -- <input_file.txt> [OPTIONS]
 **Examples:**
 ```bash
 # Basic usage: process the generated link file using default settings
-uv run app -- data/doc_links.txt
+uv run app data/doc_links.txt
 
 # Specify output directory and longer timeout
-uv run app -- data/doc_links.txt -o output/my_docs_markdown -t 90000
+uv run app data/doc_links.txt -o output/my_docs_markdown -t 90000
 
 # Use a different model and enable verbose logging
-uv run app -- data/doc_links.txt -o output/my_docs_claude -t 90000 --model openrouter/anthropic/claude-3-sonnet-20240229 -v
+uv run app data/doc_links.txt -o output/my_docs_claude -t 90000 --model openrouter/anthropic/claude-3-sonnet-20240229 -v
 ```
 
 ---
@@ -138,5 +138,5 @@ The script creates the specified output directory. Inside this directory, it sav
 
 - The `simple_link_extractor.py` script uses `rich` for colored console output.
 - Speed: The main script makes an LLM call for every URL, so processing time depends on the number of URLs, page complexity, network speed, and the chosen LLM's response time.
-- API Keys: Ensure the correct API key environment variable is set in your `.env` file and matches the `--api-key-env` argument (or its default).
+- API Keys: You can set multiple API keys inside your .env and select between them using --api-key-env. Ensure the correct API key environment variable is set in your `.env` file and matches the `--api-key-env` argument (or its default). Simply leave this argument out if you just want to use the default (default: OPENROUTER_API_KEY).
 - Errors: Check the console output for warnings (e.g., skipped lines, empty filter results) or errors (e.g., fetch failures, LLM API errors).

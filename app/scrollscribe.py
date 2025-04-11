@@ -22,9 +22,22 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
 from rich.console import Console
 from concurrent.futures import ThreadPoolExecutor  # Needed for sync filter call
+from tqdm import tqdm  # Progress bar
 
 # Load .env
 load_dotenv()
+
+
+# --- TqdmRichFile for Rich + tqdm integration ---
+class TqdmRichFile:
+    def write(self, data):
+        from tqdm import tqdm
+
+        tqdm.write(data, end="")
+
+    def flush(self):
+        pass
+
 
 # --- Rich Console ---
 console = Console()
@@ -201,8 +214,8 @@ async def main(args):
         base_url=args.base_url if args.base_url else None,
     )
 
-    # LLM Content Filter instruction
-    llm_filter_instruction = """You are an expert content extractor... Output ONLY the cleaned Markdown content."""  # Use full prompt from #150
+    # LLM Content Filter instruction - update to whatever prompt you wish. Code is optimized for Markdown extraction.
+    llm_filter_instruction = """You are an expert content extractor... Output ONLY the cleaned Markdown content."""
 
     # Create the LLMContentFilter instance
     llm_content_filter = LLMContentFilter(
@@ -219,7 +232,7 @@ async def main(args):
         page_timeout=args.timeout,  # Use timeout from args
         markdown_generator=None,  # NO markdown generation here
         # content_filter=None,  # NO filter here
-        extraction_strategy=None,  # NO extraction here
+        extraction_strategy=None,  # NO extraction strat here
         verbose=args.verbose,
     )
     # --- End Configurations ---
@@ -234,15 +247,22 @@ async def main(args):
     # urls_being_processed = []
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
+        tqdm_console = Console(file=TqdmRichFile(), markup=True, force_terminal=True)
+        pbar = tqdm(
+            urls_to_scrape,
+            desc="Processing URLs",
+            unit="url",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        )
         for index, url in enumerate(urls_to_scrape):
-            console.print(
+            tqdm_console.print(
                 f"\n[cyan][INFO] Processing URL {index + 1}/{len(urls_to_scrape)}:[/cyan] {url}"
             )
             filepath = None
 
             try:
                 # --- Pass 1: Fetch HTML ---
-                console.print("  [INFO] Fetching HTML...")
+                tqdm_console.print("  [INFO] Fetching HTML...")
                 result_list = await crawler.arun(
                     url=url, config=html_fetch_config
                 )  # Use HTML fetch config
@@ -250,16 +270,20 @@ async def main(args):
                 html_to_filter = None
                 if result_list:
                     result = result_list[0]
+                    if args.verbose:
+                        tqdm_console.print(
+                            f"[magenta][DEBUG] Fetched URL: {getattr(result, 'url', 'N/A')} | Success: {getattr(result, 'success', 'N/A')} | HTML length: {len(getattr(result, 'html', '') or '')} | Error: {getattr(result, 'error_message', '')}[/magenta]"
+                        )
                     if result.success:
                         html_to_filter = (
                             result.cleaned_html if result.cleaned_html else result.html
                         )
                         if not html_to_filter:
-                            console.print(
+                            tqdm_console.print(
                                 "  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
                             )
                     else:
-                        console.print(
+                        tqdm_console.print(
                             f"  [bold red][ERROR] HTML fetch failed: {result.error_message or 'Unknown error'}[/bold red]"
                         )
                         failed_count += 1
@@ -267,7 +291,7 @@ async def main(args):
                         await asyncio.sleep(3.0)  # 3 second delay
                         continue  # Skip to next URL
                 else:
-                    console.print(
+                    tqdm_console.print(
                         "  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
                     )
                     failed_count += 1
@@ -277,13 +301,17 @@ async def main(args):
 
                 # --- Pass 2: Filter with LLM (if HTML was fetched) ---
                 if html_to_filter:
-                    console.print(
+                    tqdm_console.print(
                         f"  [INFO] HTML fetched ({len(html_to_filter)} chars). Sending to LLM filter..."
                     )
                     filtered_md = await run_llm_filter(
                         filter_instance=llm_content_filter,
                         html_content=html_to_filter,
                     )
+                    if args.verbose and filtered_md:
+                        tqdm_console.print(
+                            f"[magenta][DEBUG] Filtered markdown length: {len(filtered_md)} chars[/magenta]"
+                        )
 
                     if filtered_md:
                         filename = url_to_filename(url, index + 1)
@@ -291,12 +319,12 @@ async def main(args):
                         try:
                             with open(filepath, "w", encoding="utf-8") as f:
                                 f.write(filtered_md)
-                            console.print(
+                            tqdm_console.print(
                                 f"[green][SUCCESS] Saved filtered markdown to:[/green] {filepath} ({len(filtered_md)} chars)"
                             )
                             success_count += 1
                         except IOError as e:
-                            console.print(
+                            tqdm_console.print(
                                 f"[bold red][ERROR] Failed to save markdown for {url} to {filepath}: {e}[/bold red]"
                             )
                             failed_count += 1
@@ -319,11 +347,11 @@ async def main(args):
             # Add a pause to avoid overwhelming the server / getting rate-limited
             # Adjust the sleep time as needed (3-5 seconds is often a safe start)
             delay_seconds = 3.0
-            console.print(
-                f"  [INFO] Waiting {delay_seconds} seconds before next URL..."
-            )
+            tqdm.write(f"  [INFO] Waiting {delay_seconds} seconds before next URL...")
             await asyncio.sleep(delay_seconds)
             # --- End Delay ---
+            pbar.update(1)
+        pbar.close()
 
     # --- End Crawling Loop ---
 
