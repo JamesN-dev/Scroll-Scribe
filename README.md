@@ -1,6 +1,6 @@
 # ScrollScribe
 
-**ScrollScribe** turns grabs docs and converts into local clean Markdown using browser automation and LLM filtering, perfect for building RAG datasets.
+**ScrollScribe** grabs docs and converts into local clean Markdown using browser automation and LLM filtering, perfect for building RAG datasets.
 
 <!-- markdownlint-disable MD004 MD007 MD041 -->
 <!-- toc-ignore-start -->
