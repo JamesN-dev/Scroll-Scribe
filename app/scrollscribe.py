@@ -5,6 +5,9 @@ import asyncio
 import os
 import sys
 import argparse
+from rich_argparse import RichHelpFormatter
+
+# No rich_argparse import; we'll use rich.console for custom help
 import re
 from urllib.parse import urlparse
 from pathlib import Path
@@ -47,8 +50,8 @@ console = Console()
 def setup_argparse():
     """Sets up and parses command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Scrape URLs from file to cleaned Markdown files using LLMContentFilter.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Scrape URLs from file to cleaned Markdown files using LLMContentFilter.\n\nExample:\n  uv run app data/doc_links.txt -o output/my_docs_markdown -t 90000",
+        formatter_class=RichHelpFormatter,
     )
     parser.add_argument("input_file", help="Path to the text file containing URLs.")
     parser.add_argument(

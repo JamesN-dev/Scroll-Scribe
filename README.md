@@ -100,19 +100,53 @@ Use the main app (`scrollscribe.py`) to process the list of URLs generated in St
 
 **Command Structure:**
 ```bash
-uv run app <input_file.txt> [OPTIONS]
+uv run app/scrollscribe.py <input_file.txt> [OPTIONS]
 ```
 
-**Arguments:**
-- `input_file` (positional): Path to the text file containing URLs (typically the output from Step 1).
-- `-o`, `--output-dir`: Directory to save filtered Markdown files. (default: `output_llm_filtered_markdown`)
-- `-t`, `--timeout`: Page load timeout in ms. (default: 60000)
-- `--wait`: Playwright wait_until state. (default: networkidle)
-- `--model`: LLM model identifier for filtering. (default: openrouter/google/gemini-2.0-flash-001)
-- `--api-key-env`: Environment variable name for the LLM API key. (default: OPENROUTER_API_KEY)
-- `--base-url`: API Base URL for LLM. (default: https://openrouter.ai/api/v1)
-- `--max-tokens`: Max output tokens for the LLM filtering. (default: 4096)
-- `-v`, `--verbose`: Enable verbose logging.
+### Arguments
+
+#### Positional
+
+- **`input_file`**  
+  Path to the text file containing URLs (typically the output from Step 1).
+
+#### Options
+
+- **`-o`, `--output-dir`**  
+  Directory to save filtered Markdown files.  
+  *Default:* `output_llm_filtered_markdown`
+
+- **`-t`, `--timeout`**  
+  Page load timeout in milliseconds.  
+  *Default:* `60000`
+
+- **`--wait`**  
+  Playwright `wait_until` state that defines when a page is considered loaded.  
+  *Options:* `load`, `domcontentloaded`, `networkidle`  
+  *Default:* `networkidle`
+
+- **`--model`**  
+  LLM model identifier to use for filtering.  
+  *Default:* `openrouter/openrouter/optimus-alpha`
+
+- **`--api-key-env`**  
+  Name of the environment variable containing your LLM API key.  
+  *Default:* `OPENROUTER_API_KEY`
+
+- **`--base-url`**  
+  Base URL for the LLM API.  
+  *Default:* `https://openrouter.ai/api/v1`
+
+- **`--max-tokens`**  
+  Maximum number of output tokens to allow in the LLM's response.  
+  *Default:* `4096`
+
+- **`-v`, `--verbose`**  
+  Enable verbose logging.  
+  *Default:* `False`
+
+- **`-h`, `--help`**  
+  Show help message and exit.
 
 **Examples:**
 ```bash

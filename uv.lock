@@ -1253,6 +1253,18 @@ wheels = [
 ]
 
 [[package]]
+name = "rich-argparse"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/aa/b9/ff53663ee7fa6a4195fa96d91da499f2e00ca067541e016d345cce1c9ad2/rich_argparse-1.7.0.tar.gz", hash = "sha256:f31d809c465ee43f367d599ccaf88b73bc2c4d75d74ed43f2d538838c53544ba", size = 38009 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/9c/dc7cbeb99a7b7422392ed7f327efdbb958bc0faf424aef5f130309320bda/rich_argparse-1.7.0-py3-none-any.whl", hash = "sha256:b8ec8943588e9731967f4f97b735b03dc127c416f480a083060433a97baf2fd3", size = 25339 },
+]
+
+[[package]]
 name = "rpds-py"
 version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1307,6 +1319,8 @@ dependencies = [
     { name = "argparse" },
     { name = "asyncio" },
     { name = "crawl4ai" },
+    { name = "rich" },
+    { name = "rich-argparse" },
 ]
 
 [package.metadata]
@@ -1314,6 +1328,8 @@ requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "asyncio", specifier = ">=3.4.3" },
     { name = "crawl4ai", specifier = ">=0.5.0.post8" },
+    { name = "rich", extras = ["argparse"] },
+    { name = "rich-argparse", specifier = ">=1.7.0" },
 ]
 
 [[package]]

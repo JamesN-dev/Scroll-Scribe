@@ -5,6 +5,9 @@ This script uses requests and BeautifulSoup to extract all links from a document
 """
 
 import argparse
+from rich_argparse import RichHelpFormatter
+
+# No rich_argparse import; we'll use rich.console for custom help
 import sys
 import requests
 from bs4 import BeautifulSoup
@@ -86,8 +89,8 @@ def extract_links(url, verbose=False):
 def setup_argparse():
     """Sets up and parses command-line arguments for link extraction."""
     parser = argparse.ArgumentParser(
-        description="Extract links from documentation websites.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Extract links from documentation websites.\n\nExample:\n  uv run app/simple_link_extractor.py https://docs.example.com/ -o data/doc_links.txt -v",
+        formatter_class=RichHelpFormatter,
     )
     parser.add_argument(
         "start_url",
