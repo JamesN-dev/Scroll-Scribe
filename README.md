@@ -1,24 +1,41 @@
-# ScrollScribe: URL List to Cleaned Markdown Scraper
+# ScrollScribe
 
-ScrollScribe is a Python tool for generating high-quality Markdown documentation from web sources in a two-step process:
+**ScrollScribe** turns grabs docs and converts into local clean Markdown using browser automation and LLM filtering, perfect for building RAG datasets.
 
-1. **Extract links from a documentation homepage or index using `simple_link_extractor.py`.**
-2. **Scrape and filter the content of each URL using `scrollscribe.py` (the main app), producing cleaned Markdown files suitable for RAG (Retrieval-Augmented Generation) or other text-processing pipelines.**
+<!-- markdownlint-disable MD004 MD007 MD041 -->
+<!-- toc-ignore-start -->
 
-It leverages `crawl4ai`'s browser automation capabilities to fetch HTML content and then utilizes an LLM (Language Model) via `crawl4ai`'s `LLMContentFilter` to intelligently extract the main content from the HTML, excluding common boilerplate like navigation, footers, and ads, before outputting Markdown.
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+  - [Step 1: Extracting Links from a Documentation Homepage](#step-1-extracting-links-from-a-documentation-homepage)
+  - [Step 2: Scraping URLs to Markdown](#step-2-scraping-urls-to-markdown)
+  - [Arguments](#arguments)
+    - [Positional](#positional)
+    - [Options](#options)
+- [Output](#output)
+- [Notes](#notes)
+- [Acknowledgments](#acknowledgments)
+
+<!-- toc-ignore-end -->
+
+ScrollScribe leverages `crawl4ai`'s browser automation capabilities to fetch HTML content and then utilizes an LLM (Language Model) via `crawl4ai`'s `LLMContentFilter` to intelligently extract the main content from the HTML, excluding common boilerplate like navigation, footers, and ads, before outputting Markdown.
 
 ---
 
 ## Features
 
-* Extracts internal links from a single documentation page (using `simple_link_extractor.py`).
-* Reads target URLs from a specified input text file (one URL per line, finds first URL on line).
-* Uses `crawl4ai` for robust, asynchronous web scraping.
-* Employs `LLMContentFilter` to intelligently parse HTML and generate clean Markdown focused on main content.
-* Configurable LLM endpoint (model, API key source, base URL) via command-line arguments (defaults to OpenRouter).
-* Configurable page load timeout and wait conditions.
-* Saves the generated Markdown for each successfully processed URL to a separate `.md` file.
-* Handles basic error checking and provides console feedback via `rich`.
+* Extracts internal links from a single documentation page using `simple_link_extractor.py`.
+* Reads target URLs from a text file, one URL per line (only the first URL per line is used).
+* Uses `crawl4ai` for robust, asynchronous scraping with Playwright.
+* Applies `LLMContentFilter` to intelligently parse HTML and extract clean, focused Markdown content.
+* Fully configurable via CLI: specify the LLM model, API key environment variable, and base URL (OpenRouter by default).
+* Supports adjustable page load timeouts and wait conditions.
+* Outputs each successfully processed page as a standalone `.md` file in the specified directory.
+* Provides a full CLI experience with colored console feedback and error reporting via `rich`.
 
 ---
 
@@ -44,7 +61,7 @@ It leverages `crawl4ai`'s browser automation capabilities to fetch HTML content 
     uv add crawl4ai rich python-dotenv litellm requests beautifulsoup4
     ```
     *(Note: `litellm` is used internally by `LLMContentFilter` for making LLM calls).*
-4. **Run Crawl4AI Setup (Installs Browsers & Checks):**
+4. **Run Crawl4AI setup to install Playwright browsers and verify your environment:**
     ```bash
     crawl4ai-setup
     ```
@@ -157,20 +174,31 @@ uv run app data/doc_links.txt
 uv run app data/doc_links.txt -o output/my_docs_markdown -t 90000
 
 # Use a different model and enable verbose logging
-uv run app data/doc_links.txt -o output/my_docs_claude -t 90000 --model openrouter/anthropic/claude-3-sonnet-20240229 -v
+uv run app data/doc_links.txt -o output/my_docs_claude -t 60000 --model openrouter/openrouter/optimus-alpha -v
 ```
 
 ---
 
 ## Output
 
-The script creates the specified output directory. Inside this directory, it saves one `.md` file for each URL that was successfully fetched and processed by the LLMContentFilter. The filename is based on the URL path (e.g., `page_001_Perfion_API.md`). These files contain the cleaned Markdown content intended for RAG ingestion.
+The script automatically creates the specified output directory if it doesn’t exist. Inside this directory, it saves one `.md` file for each URL that was successfully fetched and processed by the LLMContentFilter. The filename is based on the URL path (e.g., `page_012_api_arun.md`). These files contain the cleaned Markdown content intended for RAG ingestion.
 
 ---
 
 ## Notes
 
 - The `simple_link_extractor.py` script uses `rich` for colored console output.
+  
 - Speed: The main script makes an LLM call for every URL, so processing time depends on the number of URLs, page complexity, network speed, and the chosen LLM's response time.
+  
 - API Keys: You can set multiple API keys inside your .env and select between them using --api-key-env. Ensure the correct API key environment variable is set in your `.env` file and matches the `--api-key-env` argument (or its default). Simply leave this argument out if you just want to use the default (default: OPENROUTER_API_KEY).
+  
 - Errors: Check the console output for warnings (e.g., skipped lines, empty filter results) or errors (e.g., fetch failures, LLM API errors).
+
+---
+
+## Acknowledgments
+
+ScrollScribe is built on top of [`crawl4ai`](https://github.com/unclecode/crawl4ai), an excellent library by [@unclecode](https://github.com/unclecode) for browser automation and LLM-powered content filtering.
+
+Big ups to the crawl4ai team for building such a solid foundation... this project wouldn’t exist without it.
