@@ -1,6 +1,6 @@
 [project]
 name = "scrollscribe"
-version = "0.1.0"
+version = "0.3.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -8,6 +8,55 @@ dependencies = [
     "argparse>=1.4.0",
     "asyncio>=3.4.3",
     "crawl4ai>=0.5.0.post8",
+    "litellm>=1.65.4.post1",
     "rich-argparse>=1.7.0",
     "rich[argparse]",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+
+reportUnreachable = true                   # dead‑code detection is always handy
+reportUnnecessaryTypeIgnoreComment = false
+reportIgnoreCommentWithoutRule = false
+
+reportUnusedVariable = "none"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "data",
+    "docs",
+    "logs",
+]
+pythonVersion = "3.12"

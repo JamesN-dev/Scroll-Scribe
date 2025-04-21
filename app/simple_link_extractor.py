@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
 """
 Simple link extractor for documentation websites.
-This script uses requests and BeautifulSoup to extract all links from a documentation website.
+This script uses requests and BeautifulSoup to extract all unique internal documentation links from a given URL,
+stripping off any `#` fragments for deduplication.
 """
 
 import argparse
-from rich_argparse import RichHelpFormatter
-
-# No rich_argparse import; we'll use rich.console for custom help
 import sys
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, urljoin
-from pathlib import Path
 from rich.console import Console
+from rich_argparse import RichHelpFormatter
 
 # Initialize console for output
-console = Console()
+console: Console = Console()
 
 
-def extract_links(url, verbose=False):
-    """Extract all links from a URL."""
+def extract_links(url: str, verbose: bool = False) -> set[str]:
+    """Extract all unique internal documentation links from a URL, stripping #anchors."""
     console.print(f"[cyan][INFO] Fetching URL: {url}[/cyan]")
 
-    # Get the base URL for filtering
+    # Determine base domain
     try:
-        base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+        base_domain: str = urlparse(url).netloc
         if verbose:
-            console.print(f"[magenta][DEBUG] Base URL: {base_url}[/magenta]")
+            console.print(f"[magenta][DEBUG] Base domain: {base_domain}[/magenta]")
     except Exception as e:
         console.print(
             f"[bold red][ERROR] Could not parse domain from URL: {url} - {e}[/bold red]"
@@ -37,46 +37,48 @@ def extract_links(url, verbose=False):
     # Fetch the page
     try:
         response = requests.get(url, timeout=30)
-        response.raise_for_status()  # Raise an exception for 4XX/5XX responses
+        response.raise_for_status()
     except requests.exceptions.RequestException as e:
         console.print(f"[bold red][ERROR] Failed to fetch URL: {e}[/bold red]")
         return set()
 
-    # Parse the HTML
+    # Parse HTML
     soup = BeautifulSoup(response.text, "html.parser")
-
     if verbose:
-        console.print(
-            f"[magenta][DEBUG] Page title: {soup.title.string if soup.title else 'No title'}[/magenta]"
-        )
+        title: str = soup.title.string if soup.title else "No title"
+        console.print(f"[magenta][DEBUG] Page title: {title}[/magenta]")
 
-    # Find all links
+    # Collect and dedupe internal links
     all_links = soup.find_all("a")
     if verbose:
         console.print(f"[magenta][DEBUG] Found {len(all_links)} total links[/magenta]")
 
-    # Filter links to only include documentation links (not external links)
-    doc_links = set()
+    doc_links: set[str] = set()
+    seen_bases: set[str] = set()
+
     for link in all_links:
-        href = link.get("href")
-        if not href:
+        href: str | None = link.get("href")  # type: ignore
+        if not href or href.startswith("#"):
             continue
 
-        # Skip anchors and external links
-        if href.startswith("#"):
+        # Resolve relative URLs
+        absolute_url: str = urljoin(url, href)
+        parsed = urlparse(absolute_url)
+
+        # Skip external domains
+        if parsed.netloc != base_domain:
+            if verbose:
+                console.print(
+                    f"[magenta][DEBUG] Skipping external: {absolute_url}[/magenta]"
+                )
             continue
 
-        # Convert relative URLs to absolute
-        absolute_url = urljoin(url, href)
+        # Strip fragment (#anchor)
+        base_url: str = absolute_url.split("#")[0]
 
-        # Only include links from the same domain
-        link_domain = urlparse(absolute_url).netloc
-        if link_domain == urlparse(url).netloc:
-            doc_links.add(absolute_url)
-        elif verbose:
-            console.print(
-                f"[magenta][DEBUG] Skipping external link: {absolute_url}[/magenta]"
-            )
+        if base_url not in seen_bases:
+            seen_bases.add(base_url)
+            doc_links.add(base_url)
 
     if verbose:
         console.print(
@@ -86,21 +88,26 @@ def extract_links(url, verbose=False):
     return doc_links
 
 
-def setup_argparse():
-    """Sets up and parses command-line arguments for link extraction."""
+def setup_argparse() -> argparse.Namespace:
+    """Set up and parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Extract links from documentation websites.\n\nExample:\n  uv run app/simple_link_extractor.py https://docs.example.com/ -o data/doc_links.txt -v",
+        description=(
+            "Extract links from documentation websites.\n\n"
+            "Example:\n  uv run simple_link_extractor.py https://docs.example.com/ -o data/doc_links.txt -v"
+        ),
         formatter_class=RichHelpFormatter,
     )
     parser.add_argument(
         "start_url",
+        type=str,
         help="The starting URL to scrape for links (e.g., 'https://docs.example.com/').",
     )
     parser.add_argument(
         "-o",
         "--output-file",
+        type=str,
         required=True,
-        help="Path to the output text file to save discovered URLs (e.g., 'output/discovered_urls.txt').",
+        help="Path to the output file for saving discovered URLs.",
     )
     parser.add_argument(
         "-v",
@@ -111,41 +118,32 @@ def setup_argparse():
     return parser.parse_args()
 
 
-def main(args):
-    """Main function."""
-    # Extract links
+def main(args: argparse.Namespace) -> int:
+    """Main entry point."""
     console.print("[cyan][INFO] Starting Link Extraction...[/cyan]")
     console.print(f"[cyan][INFO] Start URL:[/cyan] {args.start_url}")
     console.print(f"[cyan][INFO] Output File:[/cyan] {args.output_file}")
 
-    found_urls = extract_links(args.start_url, args.verbose)
+    found_urls: set[str] = extract_links(args.start_url, args.verbose)
 
-    # Save discovered URLs
     if found_urls:
         console.print(
-            f"\n[cyan][INFO] Found {len(found_urls)} unique URLs. Saving to file...[/cyan]"
+            f"\n[cyan][INFO] Found {len(found_urls)} unique URLs. Saving...[/cyan]"
         )
-        output_filepath = Path(args.output_file)
+        out_path: Path = Path(args.output_file)
         try:
-            output_filepath.parent.mkdir(parents=True, exist_ok=True)
-            output_filepath.write_text(
-                "\n".join(sorted(list(found_urls))), encoding="utf-8"
-            )
-            console.print(f"[green][SUCCESS] Saved URLs to:[/green] {output_filepath}")
-        except IOError as e:
-            console.print(
-                f"[bold red][ERROR] Failed to write output file {output_filepath}: {e}[/bold red]"
-            )
-            return 1
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text("\n".join(sorted(found_urls)), encoding="utf-8")
+            console.print(f"[green][SUCCESS] Saved to {out_path}[/green]")
         except Exception as e:
             console.print(
-                f"[bold red][ERROR] Unexpected error saving file: {e}[/bold red]"
+                f"[bold red][ERROR] Could not write file {out_path}: {e}[/bold red]"
             )
             return 1
     else:
-        console.print("[yellow][WARN] No valid URLs were extracted to save.[/yellow]")
+        console.print("[yellow][WARN] No valid URLs extracted.[/yellow]")
 
-    console.print("[cyan][INFO] Link Extraction finished.[/cyan]")
+    console.print("[cyan][INFO] Extraction finished.[/cyan]")
     return 0
 
 

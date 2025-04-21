@@ -1,59 +1,127 @@
-# scroll_scribe.py v2.1
+# scrollscribe.py v0.1.4 (using rich.progress, improved logging, filename index debug)
 # Reads URLs from file, scrapes HTML, uses LLMContentFilter on HTML, saves filtered MD.
 
+import argparse
 import asyncio
 import os
-import sys
-import argparse
-from rich_argparse import RichHelpFormatter
-
-# No rich_argparse import; we'll use rich.console for custom help
 import re
-from urllib.parse import urlparse
+import sys
+import logging  # Import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional
+from urllib.parse import urlparse
+
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
-    CrawlerRunConfig,
     CacheMode,
-    CrawlResult,
-    MarkdownGenerationResult,  # Still potentially in result object
+    CrawlerRunConfig,
     LLMConfig,
 )
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
 from rich.console import Console
-from concurrent.futures import ThreadPoolExecutor  # Needed for sync filter call
-from tqdm import tqdm  # Progress bar
+from rich.logging import RichHandler  # Import RichHandler
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    BarColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich_argparse import RichHelpFormatter
+
+# --- Rich Console ---
+console = Console(force_terminal=True, color_system="truecolor")
+
+
+# ==========================================================
+# Turn on safe local debug logging
+# Warning: Logs API keys! Use only in local/dev
+# === LLM Debug Override (Optional) ===
+def inject_debug_hooks(args):
+    """Injects LiteLLM debug logging and completion tracing."""
+    if args.debug:
+        # --- Configure Root Logger with RichHandler ---
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        rich_handler = RichHandler(
+            console=console,
+            level=logging.DEBUG,
+            show_time=True,
+            show_level=True,
+            show_path=False,
+            markup=True,
+        )
+        if not any(isinstance(h, RichHandler) for h in root_logger.handlers):
+            root_logger.addHandler(rich_handler)
+            console.print("[yellow][DEBUG] RichHandler added to root logger.[/yellow]")
+        else:
+            console.print("[yellow][DEBUG] RichHandler already configured.[/yellow]")
+        # --- End Logger Configuration ---
+
+        console.print(
+            "[yellow][DEBUG] Logging configured for DEBUG level via RichHandler.[/yellow]"
+        )
+        try:
+            import litellm
+
+            litellm._turn_on_debug()
+            console.print(
+                "[yellow][DEBUG] LiteLLM debug logging enabled (should use RichHandler).[/yellow]"
+            )
+
+            from litellm import completion as real_completion
+
+            def debug_and_trace_completion(*args_, **kwargs_):
+                console.print(
+                    f"[magenta][LLM TRACE] Calling model: {kwargs_.get('model', '<unspecified>')}[/magenta]"
+                )
+                response = real_completion(*args_, **kwargs_)
+                model_used = getattr(
+                    response, "model", kwargs_.get("model", "<unspecified>")
+                )
+                console.print(
+                    f"[bold blue]🧠 Actual model used:[/bold blue] {model_used}"
+                )
+                return response
+
+            litellm.completion = debug_and_trace_completion
+            console.print(
+                "[yellow][DEBUG] LiteLLM completion wrapper injected.[/yellow]"
+            )
+
+        except ImportError:
+            console.print(
+                "[bold red][ERROR] litellm not found. Cannot enable LLM debug tracing.[/bold red]"
+            )
+        except Exception as e:
+            console.print(
+                f"[bold red][ERROR] Failed to set up LLM debug hooks: {e}[/bold red]"
+            )
+
+
+# ==========================================================
 
 # Load .env
 load_dotenv()
-
-
-# --- TqdmRichFile for Rich + tqdm integration ---
-class TqdmRichFile:
-    def write(self, data):
-        from tqdm import tqdm
-
-        tqdm.write(data, end="")
-
-    def flush(self):
-        pass
-
-
-# --- Rich Console ---
-console = Console()
 
 
 # --- Argument Parser Setup ---
 def setup_argparse():
     """Sets up and parses command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Scrape URLs from file to cleaned Markdown files using LLMContentFilter.\n\nExample:\n  uv run app data/doc_links.txt -o output/my_docs_markdown -t 90000",
+        description="Scrape URLs from file to cleaned Markdown files using LLMContentFilter.\n\nExample:\n  uv run app/scrollscribe.py data/doc_links.txt -o output/my_docs_markdown -t 90000",
         formatter_class=RichHelpFormatter,
     )
     parser.add_argument("input_file", help="Path to the text file containing URLs.")
+    parser.add_argument(
+        "--start-at",
+        type=int,
+        default=0,
+        help="Start processing at this index in the input URL list (0-based).",
+    )
     parser.add_argument(
         "-o",
         "--output-dir",
@@ -61,9 +129,16 @@ def setup_argparse():
         help="Directory to save filtered Markdown files.",
     )
     parser.add_argument(
-        "-t", "--timeout", type=int, default=60000, help="Page load timeout in ms."
+        "-p",
+        "--prompt",
+        default="",
+        help="Inject a custom instructions prompt for the LLM content filtering.",
     )
     parser.add_argument(
+        "-t", "--timeout", type=int, default=35000, help="Page load timeout in ms."
+    )
+    parser.add_argument(
+        "-w",
         "--wait",
         default="networkidle",
         choices=["load", "domcontentloaded", "networkidle"],
@@ -71,10 +146,11 @@ def setup_argparse():
     )
     parser.add_argument(
         "--model",
-        default="openrouter/openrouter/optimus-alpha",
+        default="openrouter/google/gemini-2.0-flash-exp:free",
         help="LLM model identifier for filtering.",
     )
     parser.add_argument(
+        "-api",
         "--api-key-env",
         default="OPENROUTER_API_KEY",
         help="Environment variable name for the LLM API key.",
@@ -85,24 +161,30 @@ def setup_argparse():
         help="API Base URL for LLM.",
     )
     parser.add_argument(
+        "-max",
         "--max-tokens",
         type=int,
-        default=4096,
+        default=8192,
         help="Max output tokens for the LLM filtering.",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging."
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable LLM call tracing (shows model, input/output, etc.). Not for production.",
+    )
     return parser.parse_args()
 
 
 # --- File Reading Function ---
-def read_urls_from_file(filepath: str) -> List[str]:
+def read_urls_from_file(filepath: str) -> list[str]:
     """Reads URLs from a text file, one per line, skipping empty/invalid lines."""
     urls = []
     console.print(f"[cyan][INFO] Reading URLs from:[/cyan] {filepath}")
     try:
-        with open(filepath, mode="r", encoding="utf-8") as file_object:
+        with open(filepath, encoding="utf-8") as file_object:
             for line in file_object:
                 cleaned_line = line.strip()
                 if not cleaned_line:
@@ -132,56 +214,55 @@ def url_to_filename(
     url: str, index: int, extension: str = ".md", max_len: int = 100
 ) -> str:
     """Creates a relatively safe filename from a URL and index."""
-    # (Keep the url_to_filename function from previous version)
     try:
         parsed = urlparse(url)
-        path_part = parsed.path.strip("/") or parsed.netloc
-        safe_path = re.sub(r'[\\/:*?"<>|]', "_", path_part)
+        path_part = parsed.path.strip("/") if parsed.path.strip("/") else parsed.netloc
+        safe_path = re.sub(r'[\\/:*?"<>|]+', "_", path_part)
         safe_path = re.sub(r"\s+", "_", safe_path)
         safe_path = safe_path[:max_len].rstrip("._")
         if not safe_path:
             safe_path = f"url_{index}"
         return f"page_{index:03d}_{safe_path}{extension}"
-    except Exception:
+    except Exception as e:
+        console.print(
+            f"[yellow][WARN] Failed to generate safe filename for URL index {index}: {e}. Using fallback.[/yellow]"
+        )
         return f"page_{index:03d}{extension}"
 
 
 # --- Helper to run potentially sync filter method in executor ---
 async def run_llm_filter(
     filter_instance: LLMContentFilter, html_content: str
-) -> Optional[str]:
+) -> str | None:
     """Runs the filter's potentially synchronous method in a thread pool."""
     if not html_content:
         return None
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as pool:
-            # Assuming filter_content might be synchronous
-            # If it's already async, just await it directly:
-            # filtered_chunks = await filter_instance.filter_content(html_content)
             filtered_chunks = await loop.run_in_executor(
                 pool, filter_instance.filter_content, html_content
             )
-        # LLMContentFilter likely returns a list of strings (chunks)
         if isinstance(filtered_chunks, list):
-            return "\n\n---\n\n".join(filtered_chunks)  # Join chunks
+            return "\n\n---\n\n".join(filtered_chunks)
         elif isinstance(filtered_chunks, str):
-            return filtered_chunks  # If it returns a single string
+            return filtered_chunks
         else:
             console.print(
                 f"[yellow][WARN] LLM Filter returned unexpected type: {type(filtered_chunks)}[/yellow]"
             )
             return None
     except Exception as e:
-        console.print(
-            f"[bold red][ERROR] Error running LLMContentFilter: {e}[/bold red]"
-        )
+        logging.exception(f"Error running LLMContentFilter: {e}")
         return None
 
 
 # --- Main Async Function ---
 async def main(args):
     """Reads URLs, crawls HTML, uses LLMContentFilter, saves filtered markdown."""
+    if args.debug:
+        inject_debug_hooks(args)  # Configure logging if debug is set
+
     global cli_args
     cli_args = args
 
@@ -193,9 +274,31 @@ async def main(args):
         sys.exit(1)
     console.print(f"[cyan][INFO] Found API key in env var: {args.api_key_env}[/cyan]")
 
-    urls_to_scrape = read_urls_from_file(args.input_file)
-    if not urls_to_scrape:
+    all_urls = read_urls_from_file(args.input_file)
+    if args.start_at < 0:
+        console.print(
+            "[yellow][WARN] --start-at cannot be negative. Starting from 0.[/yellow]"
+        )
+        args.start_at = 0
+    elif args.start_at >= len(all_urls):
+        console.print(
+            f"[bold red][ERROR] --start-at index {args.start_at} is out of bounds for {len(all_urls)} URLs.[/bold red]"
+        )
         return
+
+    urls_to_scrape = all_urls[args.start_at :]
+    total_urls_in_file = len(all_urls)
+
+    if not urls_to_scrape:
+        console.print(
+            f"[bold red][ERROR] No URLs left to process after --start-at {args.start_at}[/bold red]"
+        )
+        return
+
+    if args.verbose:
+        console.print(
+            f"[cyan][INFO] Starting at index {args.start_at} ({urls_to_scrape[0]})[/cyan]"
+        )
 
     output_dir = Path(args.output_dir)
     try:
@@ -209,33 +312,46 @@ async def main(args):
 
     # --- crawl4ai Configurations ---
     browser_config = BrowserConfig(headless=True, verbose=args.verbose)
-
-    # LLM Config for the filter
     llm_config = LLMConfig(
         provider=args.model,
         api_token=api_key,
         base_url=args.base_url if args.base_url else None,
     )
+    console.print(f"[cyan][INFO] Using LLM model for filtering: {args.model}[/cyan]")
 
-    # LLM Content Filter instruction - update to whatever prompt you wish. Code is optimized for Markdown extraction.
-    llm_filter_instruction = """You are an expert content extractor... Output ONLY the cleaned Markdown content."""
+    # Default prompt updated based on user input
+    default_llm_filter_instruction = """You are an expert Markdown converter for technical documentation websites.
+    Your goal is to extract ONLY the main documentation content (text, headings, code blocks, lists, tables) from the provided HTML and format it as clean, well-structured Markdown.
 
-    # Create the LLMContentFilter instance
+    **Site-Specific Hints (Use these to help identify the main content area):**
+    <site_hints>
+    - For Django docs: The main content is likely within a ` class="container sidebar-right"`, specifically look for content inside the `<main>` tag or elements related to 'docs-content'. Be aware this container might also hold irrelevant sidebar info to exclude.
+    Focus on the main documentation only. Ensure the final output contains only valid Markdown syntax. Do not include any raw HTML tags like <div>, <span>, etc. unless it is marked in a code block for demonstration
+    </site_hints>
+
+    - Preserve full absolute URLs for all links.
+    - Normalize heading styles to consistent title-case.
+    - Ensure code blocks, lists, and tables are accurately preserved.
+    - Spot-check punctuation and quoting in JSON/YAML snippets to avoid stray characters.
+    - Exclude obvious site navigation and ads, but feel free to surface any useful page-specific notes that look relevant.
+
+    Output ONLY the cleaned Markdown content. Do not add any extra explanations or commentary. Ensure the final output contains only valid Markdown syntax. Do not include any raw HTML tags like <div>, <span>, etc. unless it is marked in a code block for demonstration
+    """
+    llm_filter_instruction = (
+        args.prompt.strip() if args.prompt.strip() else default_llm_filter_instruction
+    )
     llm_content_filter = LLMContentFilter(
         llm_config=llm_config,
         instruction=llm_filter_instruction,
-        chunk_token_threshold=8000,
+        chunk_token_threshold=args.max_tokens,
         verbose=args.verbose,
     )
-
-    # Configure the run JUST TO GET HTML reliably
     html_fetch_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,  # Cache the HTML fetch
+        cache_mode=CacheMode.BYPASS,
         wait_until=args.wait,
-        page_timeout=args.timeout,  # Use timeout from args
-        markdown_generator=None,  # NO markdown generation here
-        # content_filter=None,  # NO filter here
-        extraction_strategy=None,  # NO extraction strat here
+        page_timeout=args.timeout,
+        markdown_generator=None,
+        extraction_strategy=None,
         verbose=args.verbose,
     )
     # --- End Configurations ---
@@ -245,124 +361,131 @@ async def main(args):
     )
     success_count = 0
     failed_count = 0
-    # processed_urls = set()
-    # tasks = []
-    # urls_being_processed = []
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
-        tqdm_console = Console(file=TqdmRichFile(), markup=True, force_terminal=True)
-        pbar = tqdm(
-            urls_to_scrape,
-            desc="Processing URLs",
-            unit="url",
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-        )
-        for index, url in enumerate(urls_to_scrape):
-            tqdm_console.print(
-                f"\n[cyan][INFO] Processing URL {index + 1}/{len(urls_to_scrape)}:[/cyan] {url}"
+        if args.debug:
+            console.rule("[bold magenta]🧪 LLM Debug Mode Active[/bold magenta]")
+
+        progress_columns = [
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("•"),
+            TextColumn("[cyan]{task.completed:>4d}[/]/[cyan]{task.total:>4d}[/]"),
+            TextColumn("•"),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+            TextColumn("•"),
+            SpinnerColumn(),
+        ]
+
+        with Progress(*progress_columns, console=console, transient=False) as progress:
+            crawl_task = progress.add_task(
+                "[cyan]Processing URLs", total=len(urls_to_scrape)
             )
-            filepath = None
 
-            try:
-                # --- Pass 1: Fetch HTML ---
-                tqdm_console.print("  [INFO] Fetching HTML...")
-                result_list = await crawler.arun(
-                    url=url, config=html_fetch_config
-                )  # Use HTML fetch config
+            for loop_index, url in enumerate(urls_to_scrape):
+                original_index = args.start_at + loop_index + 1
+                total_to_process = len(urls_to_scrape)
 
+                console.print(
+                    f"\n[cyan][INFO] Processing URL {loop_index + 1}/{total_to_process} (Overall: {original_index}/{total_urls_in_file}):[/cyan] {url}"
+                )
+                filepath = None
                 html_to_filter = None
-                if result_list:
-                    result = result_list[0]
-                    if args.verbose:
-                        tqdm_console.print(
-                            f"[magenta][DEBUG] Fetched URL: {getattr(result, 'url', 'N/A')} | Success: {getattr(result, 'success', 'N/A')} | HTML length: {len(getattr(result, 'html', '') or '')} | Error: {getattr(result, 'error_message', '')}[/magenta]"
-                        )
-                    if result.success:
-                        html_to_filter = (
-                            result.cleaned_html if result.cleaned_html else result.html
-                        )
-                        if not html_to_filter:
-                            tqdm_console.print(
-                                "  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
+
+                try:
+                    console.print("  [INFO] Fetching HTML...")
+                    result_list = await crawler.arun(url=url, config=html_fetch_config)
+
+                    if result_list:
+                        result = result_list[0]
+                        if args.verbose or args.debug:
+                            logging.debug(
+                                f"Fetched URL: {getattr(result, 'url', 'N/A')} | Success: {getattr(result, 'success', 'N/A')} | HTML length: {len(getattr(result, 'html', '') or '')} | Error: {getattr(result, 'error_message', '')}"
                             )
+
+                        if result.success:
+                            html_to_filter = (
+                                result.cleaned_html
+                                if result.cleaned_html
+                                else result.html
+                            )
+                            if not html_to_filter:
+                                console.print(
+                                    "  [yellow][WARN] HTML fetch succeeded but content is empty.[/yellow]"
+                                )
+                        else:
+                            console.print(
+                                f"  [bold red][ERROR] HTML fetch failed: {result.error_message or 'Unknown error'}[/bold red]"
+                            )
+                            failed_count += 1
+                            await asyncio.sleep(1.0)
+                            progress.update(crawl_task, advance=1)
+                            continue
                     else:
-                        tqdm_console.print(
-                            f"  [bold red][ERROR] HTML fetch failed: {result.error_message or 'Unknown error'}[/bold red]"
+                        console.print(
+                            "  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
                         )
                         failed_count += 1
-                        # Add delay even after failure before next URL
-                        await asyncio.sleep(3.0)  # 3 second delay
-                        continue  # Skip to next URL
-                else:
-                    tqdm_console.print(
-                        "  [yellow][WARN] No result returned from HTML fetch. Skipping.[/yellow]"
-                    )
-                    failed_count += 1
-                    # Add delay even after failure before next URL
-                    await asyncio.sleep(3.0)  # 3 second delay
-                    continue  # Skip to next URL
+                        await asyncio.sleep(1.0)
+                        progress.update(crawl_task, advance=1)
+                        continue
 
-                # --- Pass 2: Filter with LLM (if HTML was fetched) ---
-                if html_to_filter:
-                    tqdm_console.print(
-                        f"  [INFO] HTML fetched ({len(html_to_filter)} chars). Sending to LLM filter..."
-                    )
-                    filtered_md = await run_llm_filter(
-                        filter_instance=llm_content_filter,
-                        html_content=html_to_filter,
-                    )
-                    if args.verbose and filtered_md:
-                        tqdm_console.print(
-                            f"[magenta][DEBUG] Filtered markdown length: {len(filtered_md)} chars[/magenta]"
+                    if html_to_filter:
+                        console.print(
+                            f"  [INFO] HTML fetched ({len(html_to_filter)} chars). Sending to LLM filter ({args.model})..."
                         )
-
-                    if filtered_md:
-                        filename = url_to_filename(url, index + 1)
-                        filepath = output_dir / filename
-                        try:
-                            with open(filepath, "w", encoding="utf-8") as f:
-                                f.write(filtered_md)
-                            tqdm_console.print(
-                                f"[green][SUCCESS] Saved filtered markdown to:[/green] {filepath} ({len(filtered_md)} chars)"
+                        filtered_md = await run_llm_filter(
+                            filter_instance=llm_content_filter,
+                            html_content=html_to_filter,
+                        )
+                        if args.verbose and filtered_md:
+                            logging.debug(
+                                f"Filtered markdown length: {len(filtered_md)} chars"
                             )
-                            success_count += 1
-                        except IOError as e:
-                            tqdm_console.print(
-                                f"[bold red][ERROR] Failed to save markdown for {url} to {filepath}: {e}[/bold red]"
+
+                        if filtered_md:
+                            # --- ADDED DEBUG PRINT ---
+                            if args.debug or args.verbose:  # Print if debug or verbose
+                                console.print(
+                                    f"[magenta][DEBUG] Calculated original_index: {original_index} (start_at={args.start_at}, loop_index={loop_index})[/magenta]"
+                                )
+                            # --- END DEBUG PRINT ---
+                            filename = url_to_filename(url, original_index)
+                            filepath = output_dir / filename
+                            try:
+                                with open(filepath, "w", encoding="utf-8") as f:
+                                    f.write(filtered_md)
+                                console.print(
+                                    f"[green][SUCCESS] Saved filtered markdown to:[/green] {filepath} ({len(filtered_md)} chars)"
+                                )
+                                success_count += 1
+                            except OSError as e:
+                                logging.exception(
+                                    f"Failed to save markdown for {url} to {filepath}: {e}"
+                                )
+                                failed_count += 1
+                        else:
+                            console.print(
+                                f"[yellow][WARN] LLM filter returned no content for {url}. Skipping save."
                             )
                             failed_count += 1
                     else:
-                        console.print(
-                            f"[yellow][WARN] LLM filter returned no content for {url}. Skipping save.[/yellow]"
-                        )
                         failed_count += 1
-                else:
-                    # Already warned about empty HTML content above
+
+                except Exception as e:
+                    logging.exception(f"Unexpected error processing {url}: {e}")
                     failed_count += 1
 
-            except Exception as e:
+                delay_seconds = 3.0
                 console.print(
-                    f"[bold red][CRITICAL] Unexpected error processing {url}: {e}[/bold red]"
+                    f"  [INFO] Waiting {delay_seconds} seconds before next URL..."
                 )
-                failed_count += 1
+                await asyncio.sleep(delay_seconds)
+                progress.update(crawl_task, advance=1)
 
-            # --- IMPORTANT: Delay Between URLs ---
-            # Add a pause to avoid overwhelming the server / getting rate-limited
-            # Adjust the sleep time as needed (3-5 seconds is often a safe start)
-            delay_seconds = 3.0
-            tqdm.write(f"  [INFO] Waiting {delay_seconds} seconds before next URL...")
-            await asyncio.sleep(delay_seconds)
-            # --- End Delay ---
-            pbar.update(1)
-        pbar.close()
-
-    # --- End Crawling Loop ---
-
-    console.print(
-        f"\n[bold green]ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}.[/bold green]"
-    )
-
-    # --- Final Duration Log ---
     console.print(
         f"\n[bold green]ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}.[/bold green]"
     )
@@ -374,7 +497,7 @@ if __name__ == "__main__":
     api_key_env_var = cli_args.api_key_env
     if not os.getenv(api_key_env_var):
         console.print(
-            f"[bold red][ERROR] API key env var '{api_key_env_var}' not found! Set in .env.[/bold red]"
+            f"[bold red][ERROR] API key env var '{api_key_env_var}' not found! Set in .env or environment.[/bold red]"
         )
         sys.exit(1)
     asyncio.run(main(cli_args))

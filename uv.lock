@@ -1313,12 +1313,13 @@ wheels = [
 
 [[package]]
 name = "scrollscribe"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "argparse" },
     { name = "asyncio" },
     { name = "crawl4ai" },
+    { name = "litellm" },
     { name = "rich" },
     { name = "rich-argparse" },
 ]
@@ -1328,6 +1329,7 @@ requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "asyncio", specifier = ">=3.4.3" },
     { name = "crawl4ai", specifier = ">=0.5.0.post8" },
+    { name = "litellm", specifier = ">=1.65.4.post1" },
     { name = "rich", extras = ["argparse"] },
     { name = "rich-argparse", specifier = ">=1.7.0" },
 ]

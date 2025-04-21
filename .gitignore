@@ -23,5 +23,6 @@ backend/db
 PLANS.md
 
 
-data/
-output/
+data/urls
+plans/
+output/markdown
