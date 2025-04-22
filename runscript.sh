@@ -1,42 +1,52 @@
 #!/bin/bash
 
 # ScrollScribe Runner Script
-# This script uses ScrollScribe to scrape web content (e.g., Django docs) and convert it into Markdown via LLM-based filtering.
-# Customize the arguments as needed for different content sources or models.
+# This script allows you to configure ScrollScribe arguments to scrape web content
+# (specifically designed for documentation sites) and convert it into Markdown
+# via LLM-based filtering. By default, ScrollScribe is set to use
+# Google Gemini 2.0 Flash Exp(Free), mostly because its free. But I suggest using
+# Mistral AI's Codestral 2501 for the best markdown output for the price.
+# Generally will cost you $0.005-$0.01 per page using Codestral 2501.
 
-# --- Key Parameters ---
-#   - `--model`: LLM model for filtering. If omitted, defaults to gemini-2.0-flash-exp (OpenRouter free tier).
-#   - `--max-tokens`: Max tokens allowed in LLM output (default: 2048, or overridden by CLI).
-#   - `--timeout`: Page load timeout in ms (default: 30000).
-#   - `--wait`: Browser wait condition before scraping begins (e.g. 'networkidle').
-#   - `-o`: Output directory where Markdown files will be saved.
-#   - `-v`: Enable verbose logging.
-#   - `--api-key-env`: Name of the env var that stores your API key (e.g. OPENROUTER_API_KEY).
-#   - `--debug`: Triggers internal LLM tracing and logs model usage. Outputs log file if enabled.
+# Suggested Free Models
+# --model openrouter/google/gemini-2.0-flash-exp:free
+
+# Suggested Paid Models(Budget Friendly)
+# --model openrouter/mistralai/codestral-2501
+
+# Customize the arguments within the CMD variable below as needed.
+
+# --- Key Parameters for scrollscribe.py (set in CMD below) ---
+#   <input_file>: Path to the text file containing URLs (required positional).
+#   --model: LLM model for filtering.
+#   --max-tokens: Max tokens allowed in LLM output.
+#   --start-at <number>: Start processing at this index in the URL list (0-based).
+#   --timeout: Page load timeout in ms.
+#   --wait: Browser wait condition ('load', 'domcontentloaded', 'networkidle').
+#   -o: Output directory where Markdown files will be saved.
+#   -v: Enable verbose logging (INFO level) for the script.
+#   -p: Provide a custom LLM prompt string.
+#   --api-key-env: Name of the env var that stores your API key.
+#   --base-url: Custom API base URL for the LLM provider.
+# --- (No special flags for this script itself anymore) ---
 
 # --- Define ScrollScribe Command ---
-CMD="PYTHON_FORCE_COLOR=1 uv run app/scrollscribe.py \
+# Edit the arguments below for your desired run
+uv run app/scrollscribe.py \
   data/django_urls_example.txt \
-  --start-at 56 \
   -o output/django_markdown \
   -v \
-  --model openrouter/google/gemini-2.0-flash-exp:free \
+  --start-at 9 \
+  --model openrouter/mistralai/codestral-2501 \
   --max-tokens 8192 \
   --timeout 60000 \
   --wait networkidle \
-  --api-key-env OPENROUTER_API_KEY"
+  --api-key-env OPENROUTER_API_KEY
 
-# --- Optional: Enable LLM Debug Log Output ---
-if [[ "$*" == *"--debug"* ]]; then
-  LOG_PATH="output/llm_debug.log"
-echo -e "\033[1;35m━━━━━━━━━━━━━━━━━━━━🧠 LLM DEBUG MODE: LOGGING TO $LOG_PATH ━━━━━━━━━━━━━━━━━━━━\033[0m"
-  mkdir -p output
-  CMD="$CMD 2>&1 | tee $LOG_PATH"
-fi
 
-# --- Run ScrollScribe ---
-eval "$CMD"
 
 # --- Notes ---
-# Adjust input and output paths as needed.
-# Ensure that your API key is set using the specified environment variable, or loaded via .env.
+# Adjust input and output paths in CMD as needed.
+# Ensure your API key is set using the specified environment variable, or loaded via .env.
+# To save output to a file, use shell redirection: ./runscript.sh > output.log 2>&1
+
