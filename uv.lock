@@ -1318,7 +1318,9 @@ source = { virtual = "." }
 dependencies = [
     { name = "argparse" },
     { name = "asyncio" },
+    { name = "beautifulsoup4" },
     { name = "crawl4ai" },
+    { name = "requests" },
     { name = "rich" },
     { name = "rich-argparse" },
 ]
@@ -1327,7 +1329,9 @@ dependencies = [
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "asyncio", specifier = ">=3.4.3" },
+    { name = "beautifulsoup4", specifier = ">=4.13.3" },
     { name = "crawl4ai", specifier = ">=0.5.0.post8" },
+    { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", extras = ["argparse"] },
     { name = "rich-argparse", specifier = ">=1.7.0" },
 ]

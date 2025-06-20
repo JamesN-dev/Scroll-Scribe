@@ -21,10 +21,9 @@ wheels/
 node_modules/
 
 # Backend
-backend/db
 PLANS.md
-
+output/mydocs
+data/mydata
 
 data/urls
 plans/
-output/markdown

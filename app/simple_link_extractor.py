@@ -45,7 +45,7 @@ def extract_links(url: str, verbose: bool = False) -> set[str]:
     # Parse HTML
     soup = BeautifulSoup(response.text, "html.parser")
     if verbose:
-        title: str = soup.title.string if soup.title else "No title"
+        title: str | None = soup.title.string if soup.title else "No title"
         console.print(f"[magenta][DEBUG] Page title: {title}[/magenta]")
 
     # Collect and dedupe internal links

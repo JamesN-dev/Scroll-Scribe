@@ -33,10 +33,9 @@
 # --- Define ScrollScribe Command ---
 # Edit the arguments below for your desired run
 uv run app/scrollscribe.py \
-  data/django_urls_example.txt \
-  -o output/django_markdown \
+  data/urls/crawl4ai_docs.txt \
+  -o output/crawl4ai_docs \
   -v \
-  --start-at 9 \
   --model openrouter/mistralai/codestral-2501 \
   --max-tokens 8192 \
   --timeout 60000 \

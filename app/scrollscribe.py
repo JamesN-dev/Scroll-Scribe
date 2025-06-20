@@ -45,6 +45,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import cast
 from urllib.parse import urljoin, urlparse
 
 from crawl4ai import (
@@ -52,6 +53,7 @@ from crawl4ai import (
     BrowserConfig,
     CacheMode,
     CrawlerRunConfig,
+    CrawlResult,
     LLMConfig,
 )
 from crawl4ai.content_filter_strategy import LLMContentFilter
@@ -65,6 +67,7 @@ from rich.progress import (
     ProgressColumn,
     SpinnerColumn,
     Task,
+    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
@@ -283,7 +286,7 @@ async def run_llm_filter(
     with retry logic for rate limiting errors.
     """
     if not html_content:
-        return None  # Fixed E701
+        return None
 
     loop = asyncio.get_event_loop()
     max_retries = 5
@@ -522,12 +525,13 @@ async def main(args: argparse.Namespace) -> None:
         verbose=args.verbose,
     )
     html_fetch_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
+        cache_mode=CacheMode.DISABLED,
         wait_until=args.wait,
         page_timeout=args.timeout,
         markdown_generator=None,  # type: ignore[arg-type]
         extraction_strategy=None,  # type: ignore[arg-type]
         verbose=args.verbose,
+        stream=False,
     )
 
     progress_columns = [
@@ -566,9 +570,20 @@ async def main(args: argparse.Namespace) -> None:
             live_group, refresh_per_second=4, console=console, transient=False
         ) as live:
             async with AsyncWebCrawler(config=browser_config) as crawler:
-                crawl_task = progress.add_task("", total=len(urls_to_scrape))
+                crawl_task: TaskID = progress.add_task(
+                    description="", total=len(urls_to_scrape)
+                )
 
-                for loop_index, url in enumerate(urls_to_scrape):
+                all_results: list[CrawlResult] = cast(
+                    "list[CrawlResult]",
+                    await crawler.arun_many(urls_to_scrape, config=html_fetch_config),
+                )
+
+                for loop_index, (url, result) in enumerate(
+                    zip(urls_to_scrape, all_results, strict=True)
+                ):  # type: ignore
+                    if result.success:
+                        html_to_filter = result.cleaned_html or result.html
                     if shutdown_requested:
                         # Use console print for shutdown message for immediate visibility
                         console.print(
@@ -668,7 +683,7 @@ async def main(args: argparse.Namespace) -> None:
                             )
                             failed_count += 1
 
-                        delay_seconds: float = 3.0
+                        delay_seconds: float = 1.0
 
                         log.info(
                             f"{INFO_STYLE}Waiting [yellow]{delay_seconds}[/] seconds...{STYLE_END}"
