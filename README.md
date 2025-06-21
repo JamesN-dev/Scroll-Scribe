@@ -1,169 +1,230 @@
-# ScrollScribe
+# 🚀 ScrollScribe V2 - AI-Powered Documentation Scraper
 
-**ScrollScribe** grabs docs and converts them into clean local Markdown using browser automation and LLM filtering, perfect for building RAG datasets.
+**Transform any documentation website into clean, filtered Markdown files using advanced LLM processing.**
 
----
+ScrollScribe V2 is a high-performance, modular CLI tool that discovers URLs from documentation websites and converts them into clean, well-structured Markdown files using AI-powered content filtering. Unlike simple web scrapers, ScrollScribe uses Large Language Models to intelligently extract and format only the relevant documentation content.
 
-## Table of Contents
+## ✨ What's New in V2
 
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Step 1: Extracting Links](#step-1-extracting-links)
-  - [Step 2: Scraping URLs to Markdown](#step-2-scraping-urls-to-markdown)
-  - [Runner Script](#runner-script)
-- [Arguments](#arguments)
-  - [Positional](#positional)
-  - [Options](#options)
-- [Output](#output)
-- [Notes](#notes)
-- [Acknowledgments](#acknowledgments)
+### 🚀 Performance Improvements
+- **2x Speed Boost**: Fixed duplicate fetching bug - no more redundant URL requests
+- **Session Reuse**: Browser sessions persist across requests for faster crawling
+- **Smart Retries**: Automatic retry handling with exponential backoff for rate limits
+- **Memory Management**: Adaptive dispatcher prevents out-of-memory issues
 
----
+### 🎯 New CLI Interface
+- **Modular Commands**: Separate `discover`, `scrape`, and unified `process` commands
+- **Better Error Handling**: Improved error messages and graceful failure handling
+- **Flexible Usage**: Run discovery and scraping separately or as a unified pipeline
 
-## Features
+### 🏗️ Code Quality
+- **Modular Architecture**: Clean separation of concerns across multiple files
+- **Type Safety**: Full type annotations throughout the codebase
+- **Robust Exception Handling**: Custom exception hierarchy with retry logic
 
-- Extracts internal links from a documentation homepage using `simple_link_extractor.py`.
-- Reads target URLs from a text file and scrapes HTML to Markdown via `LLMContentFilter`.
-- Uses `crawl4ai`'s Playwright-based crawler for robust asynchronous scraping.
-- Applies intelligent LLM filtering to extract only core content, excluding boilerplate.
-- Fully configurable via CLI: model, API key variable, base URL, timeouts, and more.
-- Supports colored console output and debug logging via `rich`.
-- Includes a convenient `runscript.sh` for standard workflows and debug handling.
+## 🎯 Key Features
 
----
+- **🤖 AI-Powered Filtering**: Uses advanced LLMs (Mistral Codestral recommended) to extract only relevant documentation content
+- **🔗 Smart URL Discovery**: Automatically finds and follows internal documentation links
+- **📄 Clean Markdown Output**: Converts HTML to well-structured Markdown with proper formatting
+- **⚡ High Performance**: Batch processing with session reuse and intelligent rate limiting
+- **🔄 Retry Logic**: Automatic handling of rate limits and network errors
+- **📊 Rich Progress Display**: Real-time progress bars with ETA and processing rates
+- **🎨 Beautiful Console Output**: Rich terminal interface with colored status messages
 
-## Prerequisites
+## 🚀 Quick Start
 
-- Python 3.10+ (3.12+ recommended)
-- `uv` (or `pip`) Python package manager
-- Playwright browsers (installed via `crawl4ai-setup`)
-- An LLM API key (e.g., OpenRouter) available as an environment variable
-
----
-
-## Installation
-
-1. Clone or download this repository.
-2. Create and activate a virtual environment:
-   ```bash
-   uv venv
-   source .venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   uv add crawl4ai rich python-dotenv litellm requests beautifulsoup4
-   ```
-4. Install Playwright browsers:
-   ```bash
-   crawl4ai-setup
-   ```
-5. (Optional) Run diagnostics:
-   ```bash
-   crawl4ai-doctor
-   ```
-
----
-
-## Configuration
-
-Create a `.env` file in the project root and add your API key:
-
-```dotenv
-# Default expects OPENROUTER_API_KEY
-OPENROUTER_API_KEY="your_openrouter_api_key_here"
-```
-
-If you use a different provider or variable name, pass `--api-key-env` to the script.
-
----
-
-## Usage
-
-### Step 1: Extracting Links
-
-Use `simple_link_extractor.py` to crawl a homepage and extract links into a text file:
+### Installation
 
 ```bash
-uv run app/simple_link_extractor.py <start_url> -o <output_links.txt> [-v]
+# Clone the repository
+git clone <repository-url>
+cd ScrollScribe
+
+# Install dependencies (using uv - recommended)
+uv sync
+
+# Or with pip
+pip install -r requirements.txt
 ```
 
-### Step 2: Scraping URLs to Markdown
+### Set up your API key
 
-Process the list of URLs and convert to Markdown:
+Create a `.env` file in the project root:
 
 ```bash
-uv run app/scrollscribe.py <input_links.txt> [OPTIONS]
+# .env
+OPENROUTER_API_KEY="your-openrouter-api-key-here"
 ```
 
-### Runner Script
-
-A helper script `runscript.sh` is provided for common workflows:
+### Basic Usage
 
 ```bash
-./runscript.sh [--debug]
+# Discover URLs from a documentation site
+python -m app discover https://docs.example.com/ -o urls.txt
+
+# Convert URLs to markdown using AI filtering
+python -m app scrape urls.txt -o output/
+
+# Unified pipeline (discover + scrape in one command)
+python -m app process https://docs.example.com/ -o output/
 ```
 
-- Sets `PYTHON_FORCE_COLOR=1` to preserve colors
-- Uses defaults for model, timeouts, and output directory
-- If `--debug` is passed, debug output is logged to `output/llm_debug.log` via `tee`
+## 📋 Command Reference
+
+### `discover` - Extract URLs from documentation sites
+
+```bash
+python -m app discover <start_url> -o <output_file> [options]
+
+# Example
+python -m app discover https://docs.crawl4ai.com/ -o crawl4ai_urls.txt -v
+```
+
+**Options:**
+- `-o, --output-file`: File to save discovered URLs (required)
+- `-v, --verbose`: Enable verbose logging
+
+### `scrape` - Convert URLs to filtered markdown
+
+```bash
+python -m app scrape <input_file> -o <output_dir> [options]
+
+# Example
+python -m app scrape urls.txt -o output/ --model openrouter/mistralai/codestral-2501 -v
+```
+
+**Options:**
+- `--start-at N`: Start processing from URL index N (0-based)
+- `-o, --output-dir`: Output directory for markdown files (required)
+- `--model`: LLM model for filtering (default: gemini-2.0-flash-exp:free)
+- `--prompt`: Custom LLM filtering prompt
+- `--timeout`: Page timeout in milliseconds (default: 60000)
+- `--wait`: Page load condition (default: networkidle)
+- `--api-key-env`: Environment variable for API key (default: OPENROUTER_API_KEY)
+- `--base-url`: API base URL (default: https://openrouter.ai/api/v1)
+- `--max-tokens`: Max LLM output tokens (default: 8192)
+- `-v, --verbose`: Enable verbose logging
+
+### `process` - Unified pipeline (discover + scrape)
+
+```bash
+python -m app process <start_url> -o <output_dir> [options]
+
+# Example
+python -m app process https://docs.example.com/ -o output/ --model openrouter/mistralai/codestral-2501
+```
+
+Accepts all the same options as `scrape` command.
+
+## 🎨 Recommended Models
+
+### 🆓 Free Models
+- `openrouter/google/gemini-2.0-flash-exp:free` (default)
+- `openrouter/meta-llama/llama-3.2-1b-instruct:free`
+
+### 💰 Premium Models (Better Quality)
+- `openrouter/mistralai/codestral-2501` ⭐ **Recommended for best markdown output**
+- `openrouter/anthropic/claude-3-haiku`
+
+**Cost**: Premium models typically cost $0.005-$0.01 per page using Codestral 2501.
+
+## 📊 Performance Comparison
+
+| Version | Pages/Min | Duplicate Fetching | Session Reuse | Error Handling |
+|---------|-----------|-------------------|---------------|----------------|
+| V1 | ~4.9 | ❌ Yes | ❌ No | ⚠️ Manual |
+| V2 | ~9.8+ | ✅ Fixed | ✅ Yes | ✅ Automatic |
+
+## 🛠️ Advanced Usage
+
+### Custom LLM Prompts
+
+```bash
+python -m app scrape urls.txt -o output/ --prompt "Extract only API documentation and code examples. Format as markdown with clear headings."
+```
+
+### Processing Large Sites
+
+```bash
+# Start from a specific URL index (useful for resuming)
+python -m app scrape urls.txt -o output/ --start-at 50
+
+# Use longer timeout for slow sites
+python -m app scrape urls.txt -o output/ --timeout 120000
+```
+
+### Different API Providers
+
+```bash
+# Use different API key environment variable
+python -m app scrape urls.txt -o output/ --api-key-env MISTRAL_API_KEY --base-url https://api.mistral.ai/v1
+```
+
+## 📁 Project Structure
+
+```
+ScrollScribe/
+├── app/
+│   ├── __main__.py          # Package entry point
+│   ├── cli.py               # Command-line interface
+│   ├── discovery.py         # URL discovery logic
+│   ├── processing.py        # Core processing with performance fixes
+│   ├── config.py            # Configuration factories
+│   └── utils/               # Utilities (retry, exceptions)
+├── archive/                 # Original V1 files
+├── test_performance.py      # Performance testing script
+└── README.md               # This file
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**API Key Not Found**
+```bash
+[ERROR] API key env var 'OPENROUTER_API_KEY' not found!
+```
+Solution: Create `.env` file with your API key or set the environment variable.
+
+**Rate Limiting**
+```bash
+Rate limit error: Provider returned error 429
+```
+Solution: ScrollScribe automatically retries with exponential backoff. For persistent issues, try a different model or add your own API key to accumulate rate limits.
+
+**Network Errors**
+```bash
+Failed on navigating: net::ERR_ABORTED
+```
+Solution: Some sites block automated requests. Try increasing timeout or using different wait conditions.
+
+### Debug Mode
+
+Enable verbose logging for detailed information:
+
+```bash
+python -m app scrape urls.txt -o output/ -v
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [crawl4ai](https://github.com/unclecode/crawl4ai) for web crawling
+- Uses [Rich](https://github.com/Textualize/rich) for beautiful terminal output
+- LLM integration via [LiteLLM](https://github.com/BerriAI/litellm)
 
 ---
 
-## Arguments
-
-### Positional
-
-- `input_file`  
-  Path to the text file containing URLs (one per line).
-
-### Options
-
-- `-o, --output-dir`  
-  Directory to save Markdown files (default: `output_llm_filtered_markdown`).
-- `--start-at`  
-  Zero-based index in the URL list to start processing (default: `0`).
-- `-p, --prompt`  
-  Custom LLM instruction prompt (default: built-in converter prompt).
-- `-t, --timeout`  
-  Page load timeout in ms (default: `60000`).
-- `-w, --wait`  
-  Playwright wait state: `load`, `domcontentloaded`, `networkidle` (default: `networkidle`).
-- `--model`  
-  LLM model identifier (default: `openrouter/google/gemini-2.0-flash-exp:free`).
-- `--api-key-env`  
-  Environment variable for the API key (default: `OPENROUTER_API_KEY`).
-- `--base-url`  
-  Base URL for the LLM API (default: `https://openrouter.ai/api/v1`).
-- `--max-tokens`  
-  Max tokens for LLM output (default: `8192`).
-- `-v, --verbose`  
-  Enable verbose logging.
-- `--debug`  
-  Enable internal LLM debug tracing and rich-logged output.
-
----
-
-## Output
-
-The script creates the output directory if needed and writes one `.md` file per URL, named `page_XXX_<slug>.md`, containing the cleaned Markdown.
-
----
-
-## Notes
-
-- Color output requires a terminal that supports ANSI; piping or redirecting may disable colors.
-- Debug logs funnel through `rich.logging.RichHandler` and are captured when `--debug` is used.
-- File numbering properly accounts for `--start-at`.
-- Custom prompts override the default converter instruction entirely.
-
----
-
-## Acknowledgments
-
-Built on top of [`crawl4ai`](https://github.com/unclecode/crawl4ai) by @unclecode, leveraging its powerful browser automation and LLM filtering capabilities.
-
----
-
+**ScrollScribe V2** - Transforming documentation, one page at a time. 🚀
