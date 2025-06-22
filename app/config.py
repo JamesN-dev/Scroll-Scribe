@@ -64,10 +64,6 @@ def get_processing_config(session_id: str, args) -> CrawlerRunConfig:
     return CrawlerRunConfig(
         session_id=session_id,  # Enable session reuse
         cache_mode=CacheMode.DISABLED,  # Fresh content for processing
-        disable_cache=True,  # Belt and suspenders approach
-        bypass_cache=True,  # Force bypass any caching
-        no_cache_read=True,  # Don't read from cache
-        no_cache_write=True,  # Don't write to cache
         wait_until=args.wait,
         page_timeout=args.timeout,
         markdown_generator=None,  # type: ignore[arg-type]

@@ -19,7 +19,8 @@ from dotenv import load_dotenv
 from rich.panel import Panel
 
 from .config import get_browser_config
-from .discovery import extract_links, save_links_to_file
+from .discovery import save_links_to_file
+from .fast_discovery import extract_links_fast
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
 from .utils.logging import CleanConsole, set_logging_verbosity
@@ -237,7 +238,7 @@ async def discover_command(args) -> int:
     console.print_info(f"Output file: {args.output_file}")
 
     try:
-        found_urls: set[str] = extract_links(args.start_url, args.verbose)
+        found_urls: set[str] = await extract_links_fast(args.start_url, args.verbose)
 
         if found_urls:
             save_links_to_file(found_urls, args.output_file, args.verbose)

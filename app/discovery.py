@@ -1,5 +1,9 @@
 """URL discovery for documentation websites.
 
+DEPRECATED: This module is deprecated. Use fast_discovery.py instead.
+The extract_links() function in this file uses slow requests+BeautifulSoup.
+Use extract_links_fast() from fast_discovery.py for modern crawl4ai-based discovery.
+
 Extracted from simple_link_extractor.py with @retry_network decorator added.
 """
 
@@ -17,6 +21,9 @@ from .utils.retry import retry_network
 @retry_network
 def extract_links(url: str, verbose: bool = False) -> set[str]:
     """Extract all unique internal documentation links from a URL, stripping #anchors.
+
+    DEPRECATED: Use extract_links_fast() from fast_discovery.py instead.
+    This function is slow and uses legacy requests+BeautifulSoup approach.
 
     Args:
         url: The starting URL to scrape for links
@@ -104,7 +111,9 @@ def extract_links(url: str, verbose: bool = False) -> set[str]:
         raise NetworkError(f"Failed to extract links from {url}: {e}", url=url) from e
 
 
-def save_links_to_file(links: set[str], output_file: str, verbose: bool = False) -> None:
+def save_links_to_file(
+    links: set[str], output_file: str, verbose: bool = False
+) -> None:
     """Save discovered links to a text file.
 
     Args:
@@ -131,5 +140,7 @@ def save_links_to_file(links: set[str], output_file: str, verbose: bool = False)
         if verbose:
             console.print(f"[green][SUCCESS] Saved to {out_path}[/green]")
     except Exception as e:
-        console.print(f"[bold red][ERROR] Could not write file {out_path}: {e}[/bold red]")
+        console.print(
+            f"[bold red][ERROR] Could not write file {out_path}: {e}[/bold red]"
+        )
         raise

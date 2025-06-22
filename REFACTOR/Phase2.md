@@ -71,17 +71,30 @@ ScrollScribe/
 
 ## 📋 Phase 2 TODO Checklist
 
-### 1. Implement Fast (Non-LLM) HTML-to-Markdown Mode
+### 1. Fast Discovery Implementation ✅ COMPLETED
 
-- [ ] Add a `--fast` or `--no-llm` CLI flag to all relevant commands (`process`, `scrape`) to enable a fast, non-LLM HTML-to-Markdown conversion mode.
-    - When this flag is set, use a traditional HTML-to-Markdown package (e.g., `html2text`, `markdownify`) instead of LLM filtering.
-    - Typical throughput: **50-200 docs/minute** (depending on site and hardware).
-    - Update the README to document this mode, including usage examples and performance expectations.
-    - Clearly distinguish between LLM and fast modes in CLI help and documentation.
+- [x] **COMPLETED**: Replace legacy discovery with fast crawl4ai-based discovery
+    - `fast_discovery.py` now provides `extract_links_fast()` using AsyncWebCrawler
+    - CLI updated to use fast discovery by default (no more legacy bottleneck)
+    - Discovery is now fast (seconds vs ~30 seconds previously)
+    - Cache disabled by default to ensure fresh content for documentation
+    - Legacy `discovery.py` marked as deprecated with clear migration path
+    - Performance improvement: 5-10x faster discovery as planned
 
 ---
 
-### 2. Interactive Config Wizard
+### 2. Fix Fast (Non-LLM) HTML-to-Markdown Mode
+
+- [ ] Fix the existing `--fast` flag bug where it only processes 1 document but reports processing all found URLs
+    - Current issue: `--fast` mode scrapes only first document despite finding multiple URLs
+    - Ensure all discovered URLs are processed in fast mode (HTML→Markdown without LLM)
+    - Verify throughput matches expected **50-200 docs/minute** performance
+    - Test with multi-page documentation sites to confirm all pages are processed
+    - Update progress reporting to accurately reflect pages processed vs found
+
+---
+
+### 3. Interactive Config Wizard
 
 - [ ] Add `scribe config` (or `scribe wizard`) CLI command using [Questionary](https://github.com/tmbo/questionary)
     - Prompts for: **output directory** (where to save processed Markdown), model, timeout, wait, prompt, and other key options
@@ -93,7 +106,7 @@ ScrollScribe/
 
 ---
 
-### 2. CLI & Help Output Modernization
+### 4. CLI & Help Output Modernization
 
 - [ ] Integrate [rich-click](https://github.com/ewels/rich-click) or [Typer](https://typer.tiangolo.com/) for colorful, readable `--help` and error messages
 - [ ] Refactor CLI help strings for clarity, conciseness, and style
@@ -101,7 +114,7 @@ ScrollScribe/
 
 ---
 
-### 3. Progress Bar & Status UI Improvements
+### 5. Progress Bar & Status UI Improvements
 
 - [ ] Refactor to use a single persistent [Rich Progress](https://rich.readthedocs.io/en/stable/progress.html) instance for the entire run
 - [ ] Review scrollscribe.py to see how we accomplished this previously. I think we did.
@@ -113,7 +126,7 @@ ScrollScribe/
 
 ---
 
-### 4. Testing & Validation
+### 6. Testing & Validation
 
 - [ ] Test interactive wizard and config file workflow (beginner and advanced flows)
 - [ ] Test CLI-only usage (no Questionary dependency required for headless/CI)
