@@ -12,8 +12,9 @@ wheels/
 .venv
 .env
 
+.claude/
 .vscode/
-devdocs/
+other-docs/
 
 #macOS
 .DS_Store
@@ -24,13 +25,12 @@ node_modules/
 # Backend
 PLANS.md
 output/mydocs
-data/mydata
-data/session/
+
 output/testes
 tests/
 REFACTOR/
 
-data/urls
+
 plans/
 
 archive/
