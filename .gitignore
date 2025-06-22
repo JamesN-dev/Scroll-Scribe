@@ -26,7 +26,7 @@ PLANS.md
 output/mydocs
 data/mydata
 data/session/
-REFACTOR/
+output/testes
 tests/
 
 data/urls

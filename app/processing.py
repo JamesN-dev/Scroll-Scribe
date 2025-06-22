@@ -1,8 +1,19 @@
-"""Core processing functions for ScrollScribe.
+"""LLM-powered HTML-to-Markdown processing for ScrollScribe.
 
-FIXED VERSION: Proper integration with CleanConsole + persistent Live display.
-Uses exceptions.py, retry.py, and logging.py properly.
-Combines the best of original scrollscribe.py with new CleanConsole system.
+Implements the backend for the default (LLM-based) processing pipeline, used when the --fast flag is not specified in the CLI.
+Provides high-quality Markdown conversion using advanced LLM filtering, robust retry logic, and persistent progress reporting.
+
+Key features:
+- Batch processing of documentation URLs with LLM-based content filtering
+- Compatible with existing CleanConsole logging system
+- Integrates standardized exception and retry handling
+- Converts relative links to absolute URLs and generates safe filenames
+- Designed for high-quality, well-structured Markdown output
+
+Note:
+    This module shares core processing logic and utility functions (such as link absolutification and filename sanitization)
+    with both the default (LLM-based) and fast (non-LLM) processing pipelines.
+    The fast processing mode (`process_urls_fast` in `fast_processing.py`) imports and reuses these helpers to avoid duplication.
 """
 
 import asyncio
@@ -21,20 +32,16 @@ from crawl4ai import (
     CrawlResult,
 )
 from crawl4ai.content_filter_strategy import LLMContentFilter
-from rich.console import Group
-from rich.live import Live
 from rich.progress import (
     BarColumn,
     Progress,
     ProgressColumn,
     SpinnerColumn,
     Task,
-    TaskID,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.rule import Rule
 from rich.text import Text
 
 from .utils.exceptions import FileIOError, LLMError, ProcessingError
@@ -47,7 +54,20 @@ clean_console = CleanConsole()  # This handles noisy library silencing
 
 
 class RateColumn(ProgressColumn):
-    """Renders the processing rate (seconds per item) - from original scrollscribe.py."""
+    """Progress column for displaying the processing rate (seconds per item).
+
+    This column calculates and renders the average time taken to process each item
+    in a Rich progress bar.
+
+    Attributes:
+        None
+
+    Methods:
+        render(task: Task) -> Text: Calculate and render the rate for the given task.
+
+    Example:
+        progress = Progress(RateColumn(), ...)
+    """
 
     def render(self, task: Task) -> Text:
         """Calculate and render the rate."""
@@ -73,7 +93,21 @@ class RateColumn(ProgressColumn):
 
 
 def read_urls_from_file(filepath: str) -> list[str]:
-    """Reads URLs from a text file, using proper exception handling."""
+    """Read a list of URLs from a text file.
+
+    Args:
+        filepath (str): Path to the text file containing URLs, one per line.
+
+    Returns:
+        list[str]: A list of valid URLs extracted from the file.
+
+    Raises:
+        FileIOError: If the file cannot be read.
+
+    Notes:
+        - Lines that do not contain a valid URL are skipped with a warning.
+        - Only URLs starting with http:// or https:// are considered valid.
+    """
     urls: list[str] = []
     logger.info(f"Reading URLs from: {filepath}")
 
@@ -108,7 +142,25 @@ def read_urls_from_file(filepath: str) -> list[str]:
 def url_to_filename(
     url: str, index: int, extension: str = ".md", max_len: int = 100
 ) -> str:
-    """Creates a relatively safe filename from a URL and index."""
+    """Generate a safe, filesystem-friendly filename from a URL and index.
+
+    This function parses the given URL and constructs a filename that is safe for most filesystems,
+    using the URL path or netloc, sanitized and truncated as needed. The filename includes a
+    zero-padded index for ordering and the specified file extension.
+
+    Args:
+        url (str): The source URL to convert into a filename.
+        index (int): The index of the URL in the processing batch (used for ordering).
+        extension (str, optional): The file extension to use (default: ".md").
+        max_len (int, optional): Maximum length for the filename base (default: 100).
+
+    Returns:
+        str: A safe filename string suitable for saving the processed content.
+
+    Notes:
+        - If the URL cannot be parsed, a fallback filename using only the index is returned.
+        - All unsafe filesystem characters are replaced with underscores.
+    """
     try:
         parsed = urlparse(url)
         path_part: str = (
@@ -131,9 +183,21 @@ def url_to_filename(
 async def run_llm_filter(
     filter_instance: LLMContentFilter, html_content: str, url: str
 ) -> str | None:
-    """
-    Runs the LLM filter with proper retry logic and exception handling.
-    Uses @retry_llm decorator from utils/retry.py
+    """Apply an LLM-based content filter to HTML content, with automatic retry and exception handling.
+
+    This function uses the provided LLMContentFilter instance to process the given HTML content,
+    returning filtered Markdown output. Retries are handled automatically via the @retry_llm decorator.
+
+    Args:
+        filter_instance (LLMContentFilter): The LLM content filter to use for processing.
+        html_content (str): The HTML content to be filtered.
+        url (str): The source URL of the content (used for logging and context).
+
+    Returns:
+        str | None: The filtered Markdown content, or None if filtering fails after retries.
+
+    Raises:
+        LLMError: If the LLM operation fails after all retry attempts.
     """
     if not html_content:
         return None
@@ -162,9 +226,25 @@ async def run_llm_filter(
 
 
 def absolutify_links(markdown_text: str, base_url: str) -> str:
-    """
-    Converts relative links in Markdown text to absolute URLs.
-    Handles both Markdown [text](url) and inline HTML <a href="url"> links.
+    """Convert all relative links in Markdown and inline HTML to absolute URLs using the provided base URL.
+
+    This function scans the input Markdown text for:
+      - Markdown links of the form [text](url)
+      - Inline HTML anchor tags of the form <a href="url">
+
+    Any link that is not already absolute (i.e., does not start with http(s)://, mailto:, #, or data:) is converted to an absolute URL using the given base URL.
+
+    Args:
+        markdown_text (str): The Markdown content to process.
+        base_url (str): The base URL to resolve relative links against.
+
+    Returns:
+        str: The Markdown text with all relative links converted to absolute URLs.
+
+    Notes:
+        - If base_url is not provided, the function returns the input unchanged.
+        - Logs a warning if a link cannot be resolved to an absolute URL.
+        - Does not modify links that are already absolute or use unsupported schemes.
     """
     if not base_url:
         logger.warning(
@@ -225,20 +305,26 @@ async def process_urls_batch(
     llm_content_filter: LLMContentFilter,
     browser_config: BrowserConfig,
 ) -> tuple[int, int]:
-    """
-    PROPERLY INTEGRATED VERSION: Process URLs with CleanConsole + persistent Live display.
+    """Processes a batch of documentation URLs, converting each to filtered Markdown using an LLM content filter.
 
-    Combines:
-    - Your CleanConsole system for clean URL-by-URL status
-    - Original scrollscribe.py persistent Live display with model info
-    - Proper exception handling with utils/exceptions.py
-    - Retry logic with utils/retry.py
+    This function:
+    - Logs progress and status for each URL using CleanConsole.
+    - Maintains a persistent progress display with model and URL information.
+    - Handles exceptions and retries using the project's standardized utilities.
+
+    Args:
+        urls_to_scrape (list[str]): List of documentation URLs to process.
+        args: Parsed CLI arguments or configuration options.
+        output_dir (Path): Directory where Markdown files will be saved.
+        llm_content_filter (LLMContentFilter): Content filter for LLM-based processing.
+        browser_config (BrowserConfig): Configuration for the web browser/crawler.
 
     Returns:
-        tuple[int, int]: (success_count, failed_count)
+        tuple[int, int]: A tuple containing the number of successful and failed URL processings.
     """
     start_time = time.time()
 
+    # [NOT FUNCTIONAL CURRENTLY - CRAWL4AI BUG]
     # Session logic: only set session_id if --session or --session-id is provided
     session_id: str = ""
     if getattr(args, "session_id", None):
@@ -246,15 +332,12 @@ async def process_urls_batch(
     elif getattr(args, "session", False):
         session_id = "scrollscribe_session"
 
-    # Use exact config from original - preserves all functionality
     html_fetch_config = CrawlerRunConfig(
-        session_id=session_id if session_id else "",  # Always pass a string
+        session_id=session_id if session_id else "",
         cache_mode=CacheMode.DISABLED,
         wait_until=args.wait,
         page_timeout=args.timeout,
-        markdown_generator=None,  # type: ignore[arg-type]
-        extraction_strategy=None,  # type: ignore[arg-type]
-        verbose=args.verbose,  # Respect user's verbose choice
+        verbose=args.verbose,
         stream=False,
     )
 
@@ -279,17 +362,12 @@ async def process_urls_batch(
         *progress_columns, console=clean_console.console, transient=False
     )
 
-    # Extract base URL from first URL for header
+    # Extract base URL for header and print phase indicator
     base_url = urls_to_scrape[0] if urls_to_scrape else "unknown"
-    clean_domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
-
-    # Use Rose Pine dark theme header format
-    header_rule = Rule(
-        f"[bold #c4a7e7]ScrollScribe[/] | [bold #31748f]Scraping:[/] [bold #e0def4]{clean_domain}[/]",
-        style="#6e6a86",
+    clean_console.print_phase(
+        "PROCESSING", f"Converting {len(urls_to_scrape)} URLs to Markdown"
     )
-    header_text = Text(f"🧠 Model: {args.model}", justify="center", style="#9ccfd8")
-    live_group = Group(header_rule, header_text, progress)
+    clean_console.print_header(base_url, args.model, len(urls_to_scrape))
 
     logger.info(f"Starting crawl for {len(urls_to_scrape)} URLs...")
     success_count: int = 0
@@ -297,21 +375,17 @@ async def process_urls_batch(
     shutdown_requested: bool = False
 
     try:
-        with Live(
-            live_group,
-            refresh_per_second=4,
-            console=clean_console.console,
-            transient=False,
-        ) as live:
+        with clean_console.progress_bar(len(urls_to_scrape), "Processing URLs") as (
+            progress,
+            task,
+        ):
             async with AsyncWebCrawler(config=browser_config) as crawler:
-                crawl_task: TaskID = progress.add_task(
-                    description="", total=len(urls_to_scrape)
-                )
-
                 # Batch fetch with session reuse (performance fix)
-                logger.info(
-                    f"Batch fetching {len(urls_to_scrape)} URLs with session reuse..."
-                )
+                if args.verbose:
+                    progress.console.log(
+                        f"📥 [bold #9ccfd8]FETCHING[/] Downloading {len(urls_to_scrape)} pages"
+                    )
+
                 all_results: list[CrawlResult] = cast(
                     "list[CrawlResult]",
                     await crawler.arun_many(urls_to_scrape, config=html_fetch_config),
@@ -328,12 +402,19 @@ async def process_urls_batch(
                         break
 
                     original_index: int = args.start_at + loop_index + 1
-                    total_to_process: int = len(urls_to_scrape)
+                    len(urls_to_scrape)
                     url_start_time = time.time()
 
-                    logger.info(
-                        f"Processing URL {loop_index + 1}/{total_to_process} (Overall: {original_index}): {url}"
-                    )
+                    # Update progress bar with current URL
+                    clean_url = url.replace("https://", "").replace("http://", "")
+                    if len(clean_url) > 50:
+                        clean_url = clean_url[:47] + "..."
+                    progress.update(task, current_url=clean_url)
+
+                    if args.verbose:
+                        clean_console.print_fetch_status(
+                            url, "processing", progress_console=progress.console
+                        )
 
                     try:
                         if result.success:
@@ -341,11 +422,14 @@ async def process_urls_batch(
 
                             if not html_to_filter:
                                 failed_count += 1
-                                # Use CleanConsole for clean URL status
                                 clean_console.print_url_status(
-                                    url, "warning", 0, "empty content"
+                                    url,
+                                    "warning",
+                                    0,
+                                    "empty content",
+                                    progress_console=progress.console,
                                 )
-                                progress.update(crawl_task, advance=1)
+                                progress.update(task, advance=1)
                                 continue
 
                             logger.info(
@@ -371,13 +455,14 @@ async def process_urls_batch(
                                     url_time = time.time() - url_start_time
                                     chars = len(absolute_md)
 
-                                    # Use CleanConsole for clean status display
-                                    clean_console.print_url_status(
-                                        url,
-                                        "success",
-                                        url_time,
-                                        f"{chars:,} chars → {filename}",
-                                    )
+                                    if args.verbose:
+                                        clean_console.print_url_status(
+                                            url,
+                                            "success",
+                                            url_time,
+                                            f"{chars:,} chars → {filename}",
+                                            progress_console=progress.console,
+                                        )
                                     success_count += 1
 
                                 except OSError:
@@ -386,25 +471,38 @@ async def process_urls_batch(
                                         f"Failed to save markdown for {url} to {filepath}"
                                     )
                                     clean_console.print_url_status(
-                                        url, "error", 0, "save failed"
+                                        url,
+                                        "error",
+                                        0,
+                                        "save failed",
+                                        progress_console=progress.console,
                                     )
                             else:
                                 failed_count += 1
                                 clean_console.print_url_status(
-                                    url, "warning", 0, "no LLM content"
+                                    url,
+                                    "warning",
+                                    0,
+                                    "no LLM content",
+                                    progress_console=progress.console,
                                 )
                         else:
                             failed_count += 1
                             error_msg = result.error_message or "Unknown error"
                             logger.error(f"HTML fetch failed: {error_msg}")
-                            clean_console.print_url_status(url, "error", 0, error_msg)
+                            clean_console.print_url_status(
+                                url,
+                                "error",
+                                0,
+                                error_msg,
+                                progress_console=progress.console,
+                            )
 
                         # Delay between requests
                         delay_seconds: float = 1.0
                         await asyncio.sleep(delay_seconds)
 
                     except KeyboardInterrupt:
-                        live.stop()
                         clean_console.print_warning(
                             "KeyboardInterrupt caught during URL processing. Signaling shutdown..."
                         )
@@ -416,16 +514,26 @@ async def process_urls_batch(
 
                         # Use proper exception handling
                         if isinstance(exc, LLMError | ProcessingError):
-                            clean_console.print_url_status(url, "error", 0, str(exc))
+                            clean_console.print_url_status(
+                                url,
+                                "error",
+                                0,
+                                str(exc),
+                                progress_console=progress.console,
+                            )
                         else:
                             clean_console.print_url_status(
-                                url, "error", 0, "unexpected error"
+                                url,
+                                "error",
+                                0,
+                                "unexpected error",
+                                progress_console=progress.console,
                             )
 
                         await asyncio.sleep(1.0)
 
                     if not shutdown_requested:
-                        progress.update(crawl_task, advance=1)
+                        progress.update(task, advance=1)
 
     except KeyboardInterrupt:
         clean_console.print_warning(
@@ -435,10 +543,9 @@ async def process_urls_batch(
     finally:
         total_time = time.time() - start_time
 
-        # Use CleanConsole for final summary
+        # Final summary
         clean_console.print_summary(success_count, failed_count, total_time)
 
-        # Also log for structured logging
         logger.info(
             f"ScrollScribe finished processing. Saved: {success_count}. Failed/Skipped: {failed_count}."
         )

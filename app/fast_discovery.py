@@ -1,11 +1,15 @@
-"""
-fast_discovery.py
+"""Fast, reliable internal link discovery for documentation sites using Crawl4AI.
 
-Fast internal link discovery for documentation sites using Crawl4AI.
-- No LLM, no cache: always fetches fresh content.
-- Designed for use in --fast mode or as a drop-in replacement for legacy discovery.
+Implements modern, high-performance URL discovery with browser automation and JavaScript support.
+Fetches only internal documentation links, always using fresh content (no cache, no LLM).
 
-Usage:
+Key features:
+- Optimized for speed and accuracy on documentation sites
+- No LLM required; always fetches live content
+- Designed for use in --fast mode and as a drop-in replacement for legacy discovery
+- Returns only internal links relevant for documentation scraping
+
+Example:
     from fast_discovery import extract_links_fast
     links = extract_links_fast("https://docs.example.com/", verbose=True)
 """

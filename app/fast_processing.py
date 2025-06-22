@@ -1,7 +1,7 @@
 """Fast HTML-to-Markdown processing for ScrollScribe.
 
-Implements blazing-fast HTML→Markdown conversion using crawl4ai's built-in
-markdown generation with PruningContentFilter. Bypasses LLM processing entirely
+Implements the backend for the `--fast` flag in the CLI, enabling high-speed HTML→Markdown conversion
+using crawl4ai's built-in markdown generation with PruningContentFilter. Bypasses LLM processing entirely
 for 50-200 docs/minute throughput.
 
 Key features:
@@ -11,6 +11,10 @@ Key features:
 - Proper batch processing with session reuse
 - Rich progress display with persistent Live display
 - Compatible with existing CleanConsole logging system
+
+Note:
+    This module imports shared processing utilities (such as link absolutification and filename
+    sanitization) from `processing.py`.
 """
 
 import asyncio
@@ -44,7 +48,6 @@ from .processing import RateColumn, absolutify_links, url_to_filename
 from .utils.exceptions import ProcessingError
 from .utils.logging import CleanConsole, get_logger
 
-# Initialize the clean logging system
 logger = get_logger("fast_processing")
 clean_console = CleanConsole()
 
@@ -55,72 +58,58 @@ async def process_urls_fast(
     output_dir: Path,
     browser_config: BrowserConfig,
 ) -> tuple[int, int]:
-    """
-    Fast HTML→Markdown processing using crawl4ai's built-in markdown generation.
+    """Convert a batch of documentation URLs to Markdown using fast, non-LLM processing.
 
-    Features:
-    - 50-200 docs/minute throughput (5-20x faster than LLM mode)
-    - No API costs - completely free to run
-    - Uses PruningContentFilter to remove navigation, footers, low-value content
-    - Batch processing with session reuse for performance
-    - Rich progress display with persistent Live display
-    - Compatible with CleanConsole logging system
+    This function uses crawl4ai's PruningContentFilter and DefaultMarkdownGenerator
+    to efficiently convert HTML to Markdown, saving results to the specified output directory.
 
     Args:
-        urls_to_scrape: List of URLs to process
-        args: Command line arguments from argparse
-        output_dir: Output directory for markdown files
-        browser_config: Browser configuration for crawl4ai
+        urls_to_scrape: List of URLs to process.
+        args: Command line arguments from argparse.
+        output_dir: Output directory for markdown files.
+        browser_config: Browser configuration for crawl4ai.
 
     Returns:
-        tuple[int, int]: (success_count, failed_count)
+        tuple[int, int]: Number of successful and failed conversions.
     """
     start_time = time.time()
 
-    # Session logic: only set session_id if --session or --session-id is provided
     session_id: str = ""
     if getattr(args, "session_id", None):
         session_id = args.session_id
     elif getattr(args, "session", False):
         session_id = "scrollscribe_fast_session"
 
-    # Create fast mode markdown generator with PruningContentFilter
-    # Based on crawl4ai docs - removes navigation, footers, low-value content
     prune_filter = PruningContentFilter(
-        threshold=0.48,  # Balanced threshold for good content retention
-        threshold_type="fixed",  # Use fixed threshold for consistency
-        min_word_threshold=10,  # Skip very short content blocks
+        threshold=0.48,
+        threshold_type="fixed",
+        min_word_threshold=10,
     )
 
     markdown_generator = DefaultMarkdownGenerator(
         content_filter=prune_filter,
         options={
-            "ignore_links": False,  # Keep links for documentation
-            "content_source": "cleaned_html",  # Use cleaned HTML as source
+            "ignore_links": False,
+            "content_source": "cleaned_html",
         },
     )
 
-    # Configure for fast processing - bypass cache, optimize for speed
     fast_config = CrawlerRunConfig(
-        session_id=session_id if session_id else "",  # Always pass a string
-        cache_mode=CacheMode.DISABLED,  # Fresh content, no cache overhead
+        session_id=session_id if session_id else "",
+        cache_mode=CacheMode.DISABLED,
         wait_until=args.wait,
         page_timeout=args.timeout,
-        markdown_generator=markdown_generator,  # Use our fast markdown generator
-        extraction_strategy=None,  # No structured extraction needed
-        verbose=False,  # Minimize noise for speed
-        stream=False,  # Batch mode for this implementation
-        # Performance optimizations
-        exclude_external_links=True,  # Focus on internal content
+        markdown_generator=markdown_generator,
+        verbose=False,
+        stream=False,
+        exclude_external_links=True,
         excluded_tags=["script", "style", "nav", "footer", "aside", "header"],
-        word_count_threshold=10,  # Lower threshold for faster processing
-        # Fast mode specific - minimize processing overhead
-        only_text=False,  # Keep structure but optimize
-        prettiify=False,  # Skip beautification for speed
-        remove_forms=True,  # Remove forms to reduce noise
+        word_count_threshold=10,
+        only_text=False,
+        prettiify=False,
+        remove_forms=True,
     )
 
-    # Create the persistent Live display like original scrollscribe.py
     progress_columns = [
         TextColumn("[#9ccfd8]⚡ Fast Mode"),
         BarColumn(),
@@ -141,11 +130,9 @@ async def process_urls_fast(
         *progress_columns, console=clean_console.console, transient=False
     )
 
-    # Extract base URL from first URL for header
     base_url = urls_to_scrape[0] if urls_to_scrape else "unknown"
     clean_domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
 
-    # Use Rose Pine dark theme header format - indicate fast mode
     header_rule = Rule(
         f"[bold #c4a7e7]ScrollScribe[/] | [bold #31748f]Fast Mode:[/] [bold #e0def4]{clean_domain}[/]",
         style="#6e6a86",
@@ -163,7 +150,7 @@ async def process_urls_fast(
     try:
         with Live(
             live_group,
-            refresh_per_second=8,  # Higher refresh rate for fast mode
+            refresh_per_second=8,
             console=clean_console.console,
             transient=False,
         ) as live:
@@ -172,7 +159,6 @@ async def process_urls_fast(
                     description="", total=len(urls_to_scrape)
                 )
 
-                # Batch fetch with session reuse for maximum performance
                 logger.info(
                     f"Batch fetching {len(urls_to_scrape)} URLs in fast mode..."
                 )
@@ -181,7 +167,6 @@ async def process_urls_fast(
                     await crawler.arun_many(urls_to_scrape, config=fast_config),
                 )
 
-                # Process each result using CleanConsole for individual URL status
                 for loop_index, (url, result) in enumerate(
                     zip(urls_to_scrape, all_results, strict=True)
                 ):
@@ -201,7 +186,6 @@ async def process_urls_fast(
 
                     try:
                         if result.success and result.markdown:
-                            # Fast mode gets markdown directly from crawl4ai
                             raw_markdown = result.markdown.raw_markdown
 
                             if not raw_markdown or len(raw_markdown.strip()) < 50:
@@ -216,7 +200,6 @@ async def process_urls_fast(
                                 f"Markdown generated ({len(raw_markdown)} chars) - applying link fixes..."
                             )
 
-                            # Apply link absolutification
                             absolute_md = absolutify_links(raw_markdown, url)
                             filename: str = url_to_filename(url, original_index)
                             filepath = output_dir / filename
@@ -228,7 +211,6 @@ async def process_urls_fast(
                                 url_time = time.time() - url_start_time
                                 chars = len(absolute_md)
 
-                                # Use CleanConsole for clean status display
                                 clean_console.print_url_status(
                                     url,
                                     "success",
@@ -251,8 +233,7 @@ async def process_urls_fast(
                             logger.error(f"Fast processing failed: {error_msg}")
                             clean_console.print_url_status(url, "error", 0, error_msg)
 
-                        # Minimal delay for fast mode - just enough to be respectful
-                        await asyncio.sleep(0.1)  # 100ms delay
+                        await asyncio.sleep(0.1)
 
                     except KeyboardInterrupt:
                         live.stop()
@@ -267,7 +248,6 @@ async def process_urls_fast(
                             f"Unexpected error in fast processing {url}: {exc}"
                         )
 
-                        # Use proper exception handling
                         if isinstance(exc, ProcessingError):
                             clean_console.print_url_status(url, "error", 0, str(exc))
                         else:
@@ -275,7 +255,7 @@ async def process_urls_fast(
                                 url, "error", 0, "unexpected error"
                             )
 
-                        await asyncio.sleep(0.1)  # Brief pause on error
+                        await asyncio.sleep(0.1)
 
                     if not shutdown_requested:
                         progress.update(crawl_task, advance=1)
@@ -288,17 +268,14 @@ async def process_urls_fast(
     finally:
         total_time = time.time() - start_time
 
-        # Use CleanConsole for final summary
         clean_console.print_summary(success_count, failed_count, total_time)
 
-        # Calculate and display fast mode performance
         if total_time > 0:
             rate_per_minute = (success_count + failed_count) * 60 / total_time
             clean_console.print_success(
                 f"Fast mode completed: {rate_per_minute:.1f} pages/minute"
             )
 
-        # Also log for structured logging
         logger.info(
             f"Fast ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}."
         )

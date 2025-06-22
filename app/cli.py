@@ -1,9 +1,27 @@
-"""ScrollScribe V2 CLI - Unified command-line interface.
+"""ScrollScribe V2 Command Line Interface.
+
+Provides a unified CLI for AI-powered documentation scraping and conversion.
+Supports both LLM-based high-quality filtering and fast HTML-to-Markdown conversion.
 
 Commands:
-- discover: Extract URLs from a documentation website
-- scrape: Convert URLs to filtered markdown using LLM
-- process: Unified pipeline (discover + scrape)
+    discover: Extract internal documentation URLs from a starting website
+    scrape: Convert a list of URLs to filtered Markdown files using LLM or fast mode
+    process: Unified pipeline that combines discovery and scraping in one command
+
+Example Usage:
+    # Discover and process documentation in one command
+    scrollscribe process https://docs.example.com/ -o output/
+
+    # Fast mode for high-volume processing (no LLM, no API costs)
+    scrollscribe process https://docs.example.com/ -o output/ --fast
+
+    # Two-step process with custom LLM filtering
+    scrollscribe discover https://docs.example.com/ -o urls.txt
+    scrollscribe scrape urls.txt -o output/ --model gpt-4
+
+Environment Variables:
+    OPENROUTER_API_KEY: API key for LLM processing (required for non-fast modes)
+    LITELLM_LOG: Set to ERROR to reduce library logging noise
 """
 
 import argparse
@@ -33,10 +51,15 @@ console = CleanConsole()
 
 
 def setup_base_parser() -> argparse.ArgumentParser:
-    """Create the base argument parser with beautiful Rich formatting."""
+    """Create the base argument parser with Rich-formatted help output.
+
+    Returns:
+        argparse.ArgumentParser: Configured parser with program description,
+            global options, and Rich formatting for beautiful help display.
+    """
     parser = argparse.ArgumentParser(
         prog="scrollscribe",
-        description="🚀 ScrollScribe V2 - AI-powered documentation scraper\n\nTransform any documentation website into clean, filtered Markdown files using advanced LLM processing.",
+        description="ScrollScribe V2 - AI-powered documentation scraper\n\nTransform any documentation website into clean, filtered Markdown files using advanced LLM processing.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="\nExamples:\n\n  # Discover URLs from documentation site\n  scrollscribe discover https://docs.python.org/3/ -o python_urls.txt\n",
     )
@@ -48,8 +71,22 @@ def setup_base_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def setup_discover_parser(subparsers) -> None:
-    """Setup the discover subcommand."""
+def setup_discover_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Configure the 'discover' subcommand parser.
+
+    Sets up argument parsing for URL discovery functionality, which extracts
+    internal documentation links from a starting website using crawl4ai.
+
+    Args:
+        subparsers: The subparsers object from argparse to add the discover command to.
+
+    Command Arguments:
+        start_url (str): Starting URL to crawl for internal documentation links
+        -o/--output-file (str): Output file path to save discovered URLs
+        -v/--verbose (bool): Enable verbose logging for discovery process
+    """
     discover_parser = subparsers.add_parser(
         "discover", help="Extract URLs from a documentation website"
     )
@@ -67,8 +104,33 @@ def setup_discover_parser(subparsers) -> None:
     )
 
 
-def setup_scrape_parser(subparsers) -> None:
-    """Setup the scrape subcommand."""
+def setup_scrape_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Configure the 'scrape' subcommand parser.
+
+    Sets up argument parsing for URL processing functionality, which converts
+    a list of URLs to filtered Markdown files using either LLM processing
+    or fast HTML-to-Markdown conversion.
+
+    Args:
+        subparsers: The subparsers object from argparse to add the scrape command to.
+
+    Command Arguments:
+        input_file (str): Text file containing URLs to process, one per line
+        -o/--output-dir (str): Output directory for generated Markdown files
+        --fast (bool): Enable fast mode (no LLM, 50-200 docs/min, no API costs)
+        --model (str): LLM model for filtering (default: openrouter/google/mistralai/codestral-2501)
+        --prompt (str): Custom LLM filtering prompt (optional)
+        --start-at (int): Start processing from specific URL index (0-based)
+        --timeout (int): Page timeout in milliseconds (default: 60000)
+        --wait (str): Page load completion condition (default: networkidle)
+        --api-key-env (str): Environment variable containing API key
+        --base-url (str): API base URL for LLM provider
+        --max-tokens (int): Maximum output tokens for LLM filtering
+        --session/--session-id: Browser session reuse options
+        -v/--verbose (bool): Enable verbose logging
+    """
     scrape_parser = subparsers.add_parser(
         "scrape", help="Convert URLs to filtered markdown using LLM"
     )
@@ -147,8 +209,33 @@ def setup_scrape_parser(subparsers) -> None:
     )
 
 
-def setup_process_parser(subparsers) -> None:
-    """Setup the unified process subcommand."""
+def setup_process_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Configure the 'process' subcommand parser.
+
+    Sets up argument parsing for the unified processing pipeline, which combines
+    URL discovery and scraping into a single command. This is the most commonly
+    used command for end-to-end documentation processing.
+
+    Args:
+        subparsers: The subparsers object from argparse to add the process command to.
+
+    Command Arguments:
+        start_url (str): Starting URL to discover and process documentation from
+        -o/--output-dir (str): Output directory for generated Markdown files
+        --fast (bool): Enable fast mode (no LLM, 50-200 docs/min, no API costs)
+        --model (str): LLM model for filtering (default: openrouter/mistralai/codestral-2501)
+        --prompt (str): Custom LLM filtering prompt (optional)
+        --start-at (int): Start processing from specific URL index (0-based)
+        --timeout (int): Page timeout in milliseconds (default: 60000)
+        --wait (str): Page load completion condition (default: networkidle)
+        --api-key-env (str): Environment variable containing API key
+        --base-url (str): API base URL for LLM provider
+        --max-tokens (int): Maximum output tokens for LLM filtering
+        --session/--session-id: Browser session reuse options
+        -v/--verbose (bool): Enable verbose logging
+    """
     process_parser = subparsers.add_parser(
         "process", help="Unified pipeline (discover + scrape)"
     )
@@ -229,8 +316,24 @@ def setup_process_parser(subparsers) -> None:
     )
 
 
-async def discover_command(args) -> int:
-    """Execute the discover command with CleanConsole."""
+async def discover_command(args: argparse.Namespace) -> int:
+    """Execute the URL discovery command.
+
+    Extracts internal documentation links from a starting website using crawl4ai
+    with browser automation and JavaScript support. Saves discovered URLs to a file.
+
+    Args:
+        args: Parsed command line arguments containing:
+            - start_url: Starting URL to crawl
+            - output_file: File path to save discovered URLs
+            - verbose: Enable detailed logging
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+
+    Raises:
+        Exception: Any error during URL discovery or file writing
+    """
     from .utils.logging import CleanConsole
 
     console = CleanConsole()
@@ -254,8 +357,38 @@ async def discover_command(args) -> int:
         return 1
 
 
-async def scrape_command(args) -> int:
-    """Execute the scrape command with proper logging integration."""
+async def scrape_command(args: argparse.Namespace) -> int:
+    """Execute the URL scraping and conversion command.
+
+    Converts a list of URLs to filtered Markdown files using either:
+    - LLM-based filtering for high-quality content extraction (~9 seconds/URL)
+    - Fast HTML-to-Markdown conversion for high-volume processing (~0.1 seconds/URL)
+
+    Args:
+        args: Parsed command line arguments containing:
+            - input_file: Text file with URLs to process
+            - output_dir: Directory for output Markdown files
+            - fast: Enable fast mode (no LLM processing)
+            - model: LLM model for filtering (if not in fast mode)
+            - start_at: Start index for URL processing
+            - timeout: Page load timeout in milliseconds
+            - verbose: Enable detailed logging
+            - Additional LLM and browser configuration options
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+
+    Raises:
+        ConfigError: Missing API key or invalid configuration
+        FileIOError: Unable to read input file or create output directory
+        Exception: Any error during URL processing
+
+    Notes:
+        - Fast mode bypasses LLM processing and has no API costs
+        - LLM mode requires valid API key in environment variable
+        - Creates output directory if it doesn't exist
+        - Supports resuming from specific URL index with --start-at
+    """
 
     # Use YOUR logging system instead of setting up own RichHandler
     from .utils.exceptions import ConfigError, FileIOError
@@ -399,8 +532,42 @@ async def scrape_command(args) -> int:
         return 1
 
 
-async def process_command(args) -> int:
-    """Execute the unified process command (discover + scrape)."""
+async def process_command(args: argparse.Namespace) -> int:
+    """Execute the unified processing pipeline (discovery + scraping).
+
+    Combines URL discovery and scraping into a single command for end-to-end
+    documentation processing. This is the most convenient way to convert an
+    entire documentation website to Markdown files.
+
+    Process:
+    1. Discovers internal documentation URLs from the starting website
+    2. Saves URLs to a temporary file
+    3. Processes all discovered URLs using LLM or fast mode
+    4. Cleans up temporary files
+
+    Args:
+        args: Parsed command line arguments containing:
+            - start_url: Starting URL for discovery
+            - output_dir: Directory for output Markdown files
+            - fast: Enable fast mode (no LLM processing)
+            - model: LLM model for filtering (if not in fast mode)
+            - start_at: Start index for URL processing
+            - verbose: Enable detailed logging
+            - Additional LLM and browser configuration options
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+
+    Raises:
+        ConfigError: Missing API key or invalid configuration
+        Exception: Any error during discovery or processing phases
+
+    Notes:
+        - Uses temporary file for URL list between discovery and scraping phases
+        - Automatically cleans up temporary files on completion or error
+        - Fast mode bypasses LLM processing and has no API costs
+        - LLM mode requires valid API key in environment variable
+    """
     set_logging_verbosity(verbose=args.verbose)
     console.print_phase("UNIFIED PROCESSING", "Discovery + Scraping pipeline")
 
@@ -473,7 +640,31 @@ async def process_command(args) -> int:
 
 
 def main() -> int:
-    """Main CLI entry point."""
+    """Main entry point for the ScrollScribe CLI application.
+
+    Parses command line arguments, sets up subcommands, and routes execution
+    to the appropriate command handler. Provides unified error handling and
+    formatted error display using Rich panels.
+
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+
+    Command Routing:
+        - 'discover': Routes to discover_command()
+        - 'scrape': Routes to scrape_command()
+        - 'process': Routes to process_command()
+        - No command: Displays help and exits
+
+    Error Handling:
+        - ConfigError: Displays formatted configuration error panel
+        - FileIOError: Displays formatted file operation error panel
+        - Other exceptions: Propagated to caller
+
+    Notes:
+        - All async command handlers are executed using asyncio.run()
+        - Rich-formatted error panels provide helpful troubleshooting information
+        - Environment variables are loaded from .env file if present
+    """
     parser = setup_base_parser()
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

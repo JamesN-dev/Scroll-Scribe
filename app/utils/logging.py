@@ -25,7 +25,7 @@ class CleanConsole:
         self, url: str, status: str, time_taken: float, details: str = "", progress_console=None
     ):
         """Print clean status for each URL processed.
-        
+
         Args:
             url: URL being processed
             status: Status (success, error, warning)
@@ -68,7 +68,7 @@ class CleanConsole:
             status_text += f" - {details}"
 
         message = f"{icon} {clean_url} {status_text}"
-        
+
         # Use progress console if in progress context, otherwise use regular console
         if progress_console:
             progress_console.log(f"[{style}]{message}[/]")
@@ -241,7 +241,7 @@ class CleanConsole:
 
     def print_fetch_status(self, url: str, status: str, time_taken: float = 0, progress_console=None):
         """Print simplified fetch status for verbose mode.
-        
+
         Args:
             url: URL being processed
             status: Status of the operation
@@ -267,7 +267,7 @@ class CleanConsole:
 
         time_str = f"({time_taken:.1f}s)" if time_taken > 0 else ""
         message = f"{icon} [bold {style}]{status.upper()}[/] {clean_url} {time_str}"
-        
+
         # Use progress console if in progress context, otherwise use regular console
         if progress_console:
             progress_console.log(message)

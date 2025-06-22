@@ -13,9 +13,10 @@ ScrollScribe is a modular AI-powered documentation scraper that converts documen
 ### **Core Pipeline**
 
 ```
-URL Input → Discovery → Processing → Markdown Output
-    ↓         ↓           ↓            ↓
-  CLI      OLD METHOD  NEW METHOD   Clean Files
+URL Input → Discovery → Fetching → Processing → Markdown Output
+    ↓         ↓           ↓           ↓            ↓
+  CLI    crawl4ai    crawl4ai     LLM/Fast    Clean Files
+         (links)    (batch HTML)  (filter)
 ```
 
 ---
@@ -26,14 +27,16 @@ URL Input → Discovery → Processing → Markdown Output
 
 1. **Input**: Single URL or URL list
 2. **Discovery**: Extract internal documentation links using crawl4ai
-3. **Processing**: Convert HTML to filtered Markdown
-4. **Output**: Individual .md files with clean content
+3. **Fetching**: Batch download all HTML content using crawl4ai
+4. **Processing**: Convert HTML to filtered Markdown (LLM or fast mode)
+5. **Output**: Individual .md files with clean content
 
 ### **Performance Profile**
 
-- **Discovery**: Fast (~seconds, crawl4ai-powered)
-- **LLM Processing**: ~9 seconds/URL, high quality
-- **Fast Processing**: ~0.1 seconds/URL, good quality
+- **Discovery**: Fast (~seconds, crawl4ai link extraction)
+- **Fetching**: Fast (~seconds, crawl4ai batch HTML download)
+- **LLM Processing**: ~9 seconds/URL, high quality filtering
+- **Fast Processing**: ~0.1 seconds/URL, good quality filtering
 
 ---
 
@@ -319,11 +322,16 @@ word_count_threshold=10
     - **Speed**: Fast, seconds for most sites
     - **Status**: ✅ Optimized and active
 
-2. **UI Clarity** ✅ IMPROVED
-    - **Status**: Discovery/processing phases now have clear separation
-    - **Solution**: Progress bar persistence with clean phase indicators
-    - **Impact**: Eliminated user confusion about progress
-    - **Achievement**: Progress bars never break due to logging output
+2. **UI/UX Improvements** ✅ COMPLETED
+    - **Status**: Complete overhaul of terminal output and logging
+    - **Achievements**:
+        - Persistent progress bars with current URL display
+        - Clean phase separation (DISCOVERY → FETCHING → PROCESSING)
+        - Eliminated header reprinting and long separator lines
+        - Improved crawl4ai log suppression (no more `[FETCH]`, `[SCRAPE]`, `[COMPLETE]` spam)
+        - Simplified verbose output with descriptive status messages
+        - Rose Pine color theme throughout
+    - **Impact**: Eliminated user confusion about progress and current operation
 
 ### **Performance Wins**
 
@@ -333,12 +341,23 @@ word_count_threshold=10
     - **Speed**: ~9 seconds/URL (LLM) or ~0.1 seconds/URL (fast)
     - **Features**: Session reuse, concurrent fetching, smart retry
 
-2. **Code Quality** 🛠️
+2. **Terminal UI Excellence** 🎨
+
+    - **Rich Integration**: Advanced progress bars with live URL updates
+    - **Phase Indicators**: Clear `DISCOVERY`, `FETCHING`, `PROCESSING` labels
+    - **Log Management**: Smart suppression of noisy library output
+    - **Persistent Display**: Progress never interrupted by log messages
+    - **Color Theme**: Consistent Rose Pine dark theme throughout
+
+3. **Code Quality** 🛠️
+
     - Clean exception handling with retry logic
     - Modular architecture with clear separation of concerns
     - Rich console output with progress tracking
+    - Implementation-agnostic error messages
+    - Modern Python 3.10+ type hints
 
-3. **UI/UX Improvements** ✅
+4. **UI/UX Improvements** ✅
     - Progress bar persistence without display breaks
     - Rose Pine dark theme for beautiful, consistent output
     - Progress-aware logging system with comprehensive documentation
@@ -355,17 +374,26 @@ word_count_threshold=10
 - ~~Maintain same API for backward compatibility~~ ✅ MAINTAINED
 - **Status**: `fast_discovery.py` is now the active discovery method
 
-### **Priority 2: UI/UX Improvements**
+### **Priority 2: UI/UX Improvements** ✅ COMPLETED
 
-- Clear phase separation (Discovery → Processing)
-- Interactive configuration wizard
-- Better progress indication and status updates
+- ~~Clear phase separation (Discovery → Processing)~~ ✅ DONE
+- ~~Better progress indication and status updates~~ ✅ DONE
+- ~~Persistent progress bars without display interruption~~ ✅ DONE
+- ~~Remove confusing crawl4ai verbose output~~ ✅ DONE
+- ~~Implement clean Rose Pine themed output~~ ✅ DONE
+- **Status**: Terminal UI completely overhauled with persistent progress and clean phase indicators
 
-### **Priority 3: Feature Completion**
+### **Priority 3: Interactive Configuration**
+
+- Interactive configuration wizard using Questionary
+- Config file support (JSON/TOML)
+- CLI flag override system
+
+### **Priority 4: Feature Completion**
 
 - Fast mode optimization and testing
 - Session management improvements
-- Configuration file support
+- Error recovery enhancements
 
 ---
 
@@ -384,8 +412,9 @@ uv run python -m app process https://docs.crawl4ai.com/ -o output/ --fast -v
 ### **Known Issues**
 
 1. **crawl4ai context.pages bug** - Fixed via `use_managed_browser=False`
-2. **Discovery bottleneck** - Sequential processing needs upgrade
-3. **Session handling** - Some edge cases in browser session management
+2. ~~**Discovery bottleneck** - Sequential processing needs upgrade~~ ✅ FIXED
+3. ~~**Terminal UI confusion** - Mixed output and non-persistent headers~~ ✅ FIXED
+4. **Session handling** - Some edge cases in browser session management
 
 ### **Dependencies**
 
