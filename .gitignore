@@ -24,6 +24,9 @@ node_modules/
 PLANS.md
 output/mydocs
 data/mydata
+data/session/
+REFACTOR/
+tests/
 
 data/urls
 plans/

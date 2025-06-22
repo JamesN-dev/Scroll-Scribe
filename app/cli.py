@@ -17,12 +17,12 @@ from crawl4ai import LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.panel import Panel
 
 from .config import get_browser_config
 from .discovery import extract_links, save_links_to_file
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
-from rich.panel import Panel
 
 # Load environment variables from .env file
 load_dotenv()

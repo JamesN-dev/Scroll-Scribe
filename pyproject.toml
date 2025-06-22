@@ -1,18 +1,33 @@
 [project]
 name = "scrollscribe"
 version = "0.3.0"
-description = "Add your description here"
+description = "AI-powered documentation scraper that transforms websites into clean, filtered Markdown"
 readme = "README.md"
-requires-python = ">=3.12"
+license = { text = "MIT" }
+requires-python = ">=3.10"
 dependencies = [
-    "argparse>=1.4.0",
-    "asyncio>=3.4.3",
-    "beautifulsoup4>=4.13.3",
-    "crawl4ai>=0.5.0.post8",
-    "requests>=2.32.3",
+    "crawl4ai>=0.6.3",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.26.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.9.0",
     "rich-argparse>=1.7.0",
-    "rich[argparse]",
+    "tenacity>=8.0.0",
+    "questionary>=2.1.0",
 ]
+
+[project.scripts]
+scrollscribe = "app.cli:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = []
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -24,11 +39,9 @@ major_version_zero = true
 
 [tool.basedpyright]
 typeCheckingMode = "basic"
-
-reportUnreachable = true                   # dead‑code detection is always handy
+reportUnreachable = true
 reportUnnecessaryTypeIgnoreComment = false
 reportIgnoreCommentWithoutRule = false
-
 reportUnusedVariable = "none"
 exclude = [
     ".bzr",
@@ -60,4 +73,4 @@ exclude = [
     "docs",
     "logs",
 ]
-pythonVersion = "3.12"
+pythonVersion = "3.10"
