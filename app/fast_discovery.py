@@ -57,7 +57,7 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
     console = CleanConsole()
 
     if verbose:
-        console.print_info(f"Starting fast discovery for: {start_url}")
+        console.print_phase("DISCOVERY", f"Extracting links from {start_url}")
 
     config = CrawlerRunConfig(
         css_selector="a[href]",
@@ -95,14 +95,12 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
                         f"Discovery operation failed: {error_msg}", url=start_url
                     )
 
-            # Extract links from result
-            links_data = result.links or {}
+            # Extract links from result - safely access links attribute
+            links_data = getattr(result, "links", {}) or {}
             internal_link_list = links_data.get("internal", [])
 
             if verbose:
-                console.print_info(
-                    f"Found {len(internal_link_list)} raw internal links"
-                )
+                console.print_fetch_status(start_url, "fetched")
 
             # Process and filter links
             for link in internal_link_list:
@@ -115,7 +113,7 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
 
             if verbose:
                 console.print_success(
-                    f"Fast discovery completed: {len(internal_links)} unique internal links from {start_url}"
+                    f"Discovery completed: {len(internal_links)} unique internal links"
                 )
 
     except (InvalidUrlError, NetworkError):

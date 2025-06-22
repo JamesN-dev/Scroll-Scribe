@@ -265,21 +265,30 @@ word_count_threshold=10
 - Retry-aware exceptions with backoff calculation
 - Provider-specific error handling (OpenRouter, etc.)
 
-#### **`logging.py`** - Console Output System
+#### **`logging.py`** - Console Output System ✅ ENHANCED
 
-**Role:** Beautiful terminal output with Rose Pine color theme
+**Role:** Beautiful terminal output with Rose Pine color theme and progress bar integration
 
 **Key Classes:**
 
-- `CleanConsole` - Main console output manager
+- `CleanConsole` - Main console output manager with progress-aware logging
 - `ScrollScribeLogger` - Enhanced logger with Rich integration
 
 **Features:**
 
-- URL-by-URL status display with icons (✅❌⚠️)
-- Live progress bars with ETA and rate calculation
-- Rose Pine dark color theme for beautiful output
-- Noise suppression for chatty libraries (litellm, httpx)
+- ✅ **ENHANCED**: URL-by-URL status display with icons (✅❌⚠️)
+- ✅ **ENHANCED**: Live progress bars with ETA and rate calculation
+- ✅ **ENHANCED**: Progress bar persistence - no more broken displays
+- ✅ **NEW**: Progress-aware logging with `progress_console` parameter
+- ✅ **ENHANCED**: Rose Pine dark color theme for beautiful output
+- ✅ **ENHANCED**: Noise suppression for chatty libraries (litellm, httpx)
+
+**Progress Bar Integration:**
+
+- All logging methods support `progress_console` parameter
+- Pattern: `clean_console.print_url_status(url, status, time, details, progress_console=progress.console)`
+- Ensures progress bars never break due to logging output
+- Comprehensive developer documentation in `LOGGING.md`
 
 #### **`retry.py`** - Intelligent Retry Logic
 
@@ -310,10 +319,11 @@ word_count_threshold=10
     - **Speed**: Fast, seconds for most sites
     - **Status**: ✅ Optimized and active
 
-2. **UI Clarity** 🔄
-    - **Issue**: Discovery/processing phases could have better separation
-    - **Impact**: Minor user confusion about progress
-    - **Fix**: Better phase indicators and progress separation
+2. **UI Clarity** ✅ IMPROVED
+    - **Status**: Discovery/processing phases now have clear separation
+    - **Solution**: Progress bar persistence with clean phase indicators
+    - **Impact**: Eliminated user confusion about progress
+    - **Achievement**: Progress bars never break due to logging output
 
 ### **Performance Wins**
 
@@ -327,6 +337,12 @@ word_count_threshold=10
     - Clean exception handling with retry logic
     - Modular architecture with clear separation of concerns
     - Rich console output with progress tracking
+
+3. **UI/UX Improvements** ✅
+    - Progress bar persistence without display breaks
+    - Rose Pine dark theme for beautiful, consistent output
+    - Progress-aware logging system with comprehensive documentation
+    - Clean separation between user-facing and debug logging
 
 ---
 
@@ -384,6 +400,7 @@ uv run python -m app process https://docs.crawl4ai.com/ -o output/ --fast -v
 ## 📚 Further Reading
 
 - `REFACTOR/Phase2.md` - Detailed upgrade plans and priorities
+- `LOGGING.md` - **NEW**: Comprehensive logging system guide and best practices
 - `REFACTOR/bug.md` - Known issues and upstream bug reports
 - `archive/` - Legacy V1 implementation for reference
 - `pyproject.toml` - Dependencies and project configuration

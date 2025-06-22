@@ -13,6 +13,7 @@ wheels/
 .env
 
 .vscode/
+devdocs/
 
 #macOS
 .DS_Store
@@ -33,3 +34,4 @@ plans/
 
 archive/
 tests/
+docs/scraped-docs

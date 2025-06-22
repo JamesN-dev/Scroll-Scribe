@@ -234,7 +234,9 @@ async def discover_command(args) -> int:
     from .utils.logging import CleanConsole
 
     console = CleanConsole()
-    console.print_info(f"Starting Link Discovery from: {args.start_url}")
+    set_logging_verbosity(verbose=args.verbose)
+
+    console.print_phase("DISCOVERY", f"Finding internal links from {args.start_url}")
     console.print_info(f"Output file: {args.output_file}")
 
     try:
@@ -242,7 +244,7 @@ async def discover_command(args) -> int:
 
         if found_urls:
             save_links_to_file(found_urls, args.output_file, args.verbose)
-            console.print_info(f"Discovery finished. Found {len(found_urls)} URLs.")
+            console.print_success(f"Discovery finished. Found {len(found_urls)} URLs.")
             return 0
         else:
             console.print_warning("No valid URLs extracted.")
@@ -399,7 +401,8 @@ async def scrape_command(args) -> int:
 
 async def process_command(args) -> int:
     """Execute the unified process command (discover + scrape)."""
-    console.print_info("Starting unified process (discover + scrape)...")
+    set_logging_verbosity(verbose=args.verbose)
+    console.print_phase("UNIFIED PROCESSING", "Discovery + Scraping pipeline")
 
     try:
         # Step 1: Discovery
