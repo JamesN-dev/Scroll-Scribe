@@ -32,15 +32,14 @@
 
 # --- Define ScrollScribe Command ---
 # Edit the arguments below for your desired run
-uv run app/scrollscribe.py \
-  data/urls/crawl4ai_docs.txt \
-  -o output/crawl4ai_docs \
+uv run python -m app process https://gofastmcp.com/getting-started/welcome -o output/fastmcp_scrape \
   -v \
   --model openrouter/mistralai/codestral-2501 \
-  --max-tokens 8192 \
+  --wait domcontentloaded \
   --timeout 60000 \
-  --wait networkidle \
+  --max-tokens 10192 \
   --api-key-env OPENROUTER_API_KEY
+
 
 
 
@@ -48,4 +47,3 @@ uv run app/scrollscribe.py \
 # Adjust input and output paths in CMD as needed.
 # Ensure your API key is set using the specified environment variable, or loaded via .env.
 # To save output to a file, use shell redirection: ./runscript.sh > output.log 2>&1
-

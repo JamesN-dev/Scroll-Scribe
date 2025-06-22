@@ -1,13 +1,11 @@
 """Core processing functions for ScrollScribe.
 
-Extracted from scrollscribe.py with critical performance fixes:
-1. Fixed duplicate fetching bug (2x speed improvement)
-2. Added session reuse (additional speed boost)
-3. Applied @retry_llm decorator to replace manual retry logic
+FIXED VERSION: Proper integration with CleanConsole + persistent Live display.
+Uses exceptions.py, retry.py, and logging.py properly.
+Combines the best of original scrollscribe.py with new CleanConsole system.
 """
 
 import asyncio
-import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +21,7 @@ from crawl4ai import (
     CrawlResult,
 )
 from crawl4ai.content_filter_strategy import LLMContentFilter
-from rich.console import Console, Group
+from rich.console import Group
 from rich.live import Live
 from rich.progress import (
     BarColumn,
@@ -39,31 +37,25 @@ from rich.progress import (
 from rich.rule import Rule
 from rich.text import Text
 
-from .utils.exceptions import FileIOError
+from .utils.exceptions import FileIOError, LLMError, ProcessingError
+from .utils.logging import CleanConsole, get_logger
 from .utils.retry import retry_llm
 
-# Get the same logger and styles as original
-log = logging.getLogger()
-console = Console(force_terminal=True, color_system="truecolor")
-
-# Same styles as original scrollscribe.py
-INFO_STYLE = "[bright_green]"
-WARN_STYLE = "[bright_yellow]"
-ERROR_STYLE = "[bright_red]"
-CRITICAL_STYLE = "[bold white on red]"
-STYLE_END = "[/]"
+# Initialize the clean logging system
+logger = get_logger("processing")
+clean_console = CleanConsole()  # This handles noisy library silencing
 
 
 class RateColumn(ProgressColumn):
-    """Renders the processing rate (seconds per item) - copied from scrollscribe.py."""
+    """Renders the processing rate (seconds per item) - from original scrollscribe.py."""
 
     def render(self, task: Task) -> Text:
         """Calculate and render the rate."""
         if not task.completed or task.start_time is None:
-            return Text("-.-- s/item", style="progress.remaining")
+            return Text("-.-- s/item", style="#6e6a86")
         elapsed = task.finished_time if task.finished else time.monotonic()
         if elapsed is None:
-            return Text("-.-- s/item", style="progress.remaining")
+            return Text("-.-- s/item", style="#6e6a86")
         assert isinstance(elapsed, float), (
             f"Expected float for elapsed, got {type(elapsed)}"
         )
@@ -72,18 +64,19 @@ class RateColumn(ProgressColumn):
         )
         run_time = elapsed - task.start_time
         if run_time <= 0:
-            return Text("-.-- s/item", style="progress.remaining")
+            return Text("-.-- s/item", style="#6e6a86")
         items_per_second = task.completed / run_time
         if items_per_second <= 0:
-            return Text("-.-- s/item", style="progress.remaining")
+            return Text("-.-- s/item", style="#6e6a86")
         seconds_per_item = 1.0 / items_per_second
-        return Text(f"{seconds_per_item:.2f} s/item", style="progress.remaining")
+        return Text(f"{seconds_per_item:.2f} s/item", style="#6e6a86")
 
 
 def read_urls_from_file(filepath: str) -> list[str]:
-    """Reads URLs from a text file, one per line, skipping empty/invalid lines."""
+    """Reads URLs from a text file, using proper exception handling."""
     urls: list[str] = []
-    log.info(f"{INFO_STYLE}Reading URLs from: [cyan]{filepath}[/]{STYLE_END}")
+    logger.info(f"Reading URLs from: {filepath}")
+
     try:
         with open(filepath, encoding="utf-8") as file_object:
             for line in file_object:
@@ -95,24 +88,20 @@ def read_urls_from_file(filepath: str) -> list[str]:
                     url: str = match.group(0).rstrip(".,;:!?")
                     urls.append(url)
                 else:
-                    log.warning(
-                        f"{WARN_STYLE}Skipping invalid line: '{cleaned_line}'{STYLE_END}"
-                    )
-    except FileNotFoundError:
-        log.error(
-            f"{ERROR_STYLE}Input file not found: [underline]{filepath}[/underline]{STYLE_END}"
-        )
+                    logger.warning(f"Skipping invalid line: '{cleaned_line}'")
+
+    except FileNotFoundError as err:
+        logger.error(f"Input file not found: {filepath}")
         raise FileIOError(
             f"Input file not found: {filepath}", filepath=filepath, operation="read"
-        )
-    except Exception:
-        log.exception(
-            f"{ERROR_STYLE}Failed to read file [underline]{filepath}[/underline]{STYLE_END}"
-        )
+        ) from err
+    except Exception as err:
+        logger.error(f"Failed to read file: {filepath}")
         raise FileIOError(
             f"Failed to read file: {filepath}", filepath=filepath, operation="read"
-        )
-    log.info(f"{INFO_STYLE}Found [bold]{len(urls)}[/] valid URLs in file.{STYLE_END}")
+        ) from err
+
+    logger.info(f"Found {len(urls)} valid URLs in file")
     return urls
 
 
@@ -132,41 +121,44 @@ def url_to_filename(
             safe_path = f"url_{index}"
         return f"page_{index:03d}_{safe_path}{extension}"
     except Exception:
-        log.exception(
-            f"{ERROR_STYLE}Failed to generate safe filename for URL index [bold]{index}[/]. Using fallback.{STYLE_END}"
+        logger.error(
+            f"Failed to generate safe filename for URL index {index}. Using fallback."
         )
         return f"page_{index:03d}{extension}"
 
 
 @retry_llm
 async def run_llm_filter(
-    filter_instance: LLMContentFilter, html_content: str
+    filter_instance: LLMContentFilter, html_content: str, url: str
 ) -> str | None:
     """
-    Runs the filter's potentially synchronous method in a thread pool.
-    Fixed version with @retry_llm decorator instead of manual retry logic.
+    Runs the LLM filter with proper retry logic and exception handling.
+    Uses @retry_llm decorator from utils/retry.py
     """
     if not html_content:
         return None
 
     loop = asyncio.get_event_loop()
 
-    # Removed manual retry loop - @retry_llm decorator handles this now!
-    with ThreadPoolExecutor() as pool:
-        filtered_chunks = await loop.run_in_executor(
-            pool, filter_instance.filter_content, html_content
-        )
+    try:
+        with ThreadPoolExecutor() as pool:
+            filtered_chunks = await loop.run_in_executor(
+                pool, filter_instance.filter_content, html_content
+            )
 
-    # Process successful result (same as original)
-    if isinstance(filtered_chunks, list):
-        return "\n\n---\n\n".join(filtered_chunks)
-    elif isinstance(filtered_chunks, str):
-        return filtered_chunks
-    else:
-        log.warning(
-            f"{WARN_STYLE}LLM Filter returned unexpected type: [bold]{type(filtered_chunks)}[/]{STYLE_END}"
-        )
-        return None
+        # Process successful result
+        if isinstance(filtered_chunks, list):
+            return "\n\n---\n\n".join(filtered_chunks)
+        elif isinstance(filtered_chunks, str):
+            return filtered_chunks
+        else:
+            raise LLMError(
+                f"LLM Filter returned unexpected type: {type(filtered_chunks)}", url=url
+            )
+
+    except Exception as e:
+        # Let @retry_llm handle the retries
+        raise LLMError(f"LLM filter failed: {str(e)}", url=url) from e
 
 
 def absolutify_links(markdown_text: str, base_url: str) -> str:
@@ -175,8 +167,8 @@ def absolutify_links(markdown_text: str, base_url: str) -> str:
     Handles both Markdown [text](url) and inline HTML <a href="url"> links.
     """
     if not base_url:
-        log.warning(
-            f"{WARN_STYLE}Base URL not provided to absolutify_links, skipping post-processing.{STYLE_END}"
+        logger.warning(
+            "Base URL not provided to absolutify_links, skipping post-processing."
         )
         return markdown_text
 
@@ -196,8 +188,8 @@ def absolutify_links(markdown_text: str, base_url: str) -> str:
                 changes_made = True
             return f"[{text}]({absolute_link})"
         except ValueError:
-            log.warning(
-                f"{WARN_STYLE}Could not absolutify MD link: '{link}' with base '{base_url}'{STYLE_END}"
+            logger.warning(
+                f"Could not absolutify MD link: '{link}' with base '{base_url}'"
             )
             return m.group(0)
 
@@ -217,13 +209,12 @@ def absolutify_links(markdown_text: str, base_url: str) -> str:
                 changes_made = True
             return f"{before}{absolute_link}{after}"
         except ValueError:
-            log.warning(
-                f"{WARN_STYLE}Could not absolutify HTML href: '{link}' with base '{base_url}'{STYLE_END}"
+            logger.warning(
+                f"Could not absolutify HTML href: '{link}' with base '{base_url}'"
             )
             return m.group(0)
 
     processed_text = html_link_pattern.sub(repl_html, processed_text)
-
     return processed_text
 
 
@@ -235,185 +226,221 @@ async def process_urls_batch(
     browser_config: BrowserConfig,
 ) -> tuple[int, int]:
     """
-    FIXED VERSION: Process URLs with session reuse and no duplicate fetching.
+    PROPERLY INTEGRATED VERSION: Process URLs with CleanConsole + persistent Live display.
+
+    Combines:
+    - Your CleanConsole system for clean URL-by-URL status
+    - Original scrollscribe.py persistent Live display with model info
+    - Proper exception handling with utils/exceptions.py
+    - Retry logic with utils/retry.py
 
     Returns:
         tuple[int, int]: (success_count, failed_count)
     """
+    start_time = time.time()
 
-    # 🚀 PERFORMANCE FIX 1: Add session reuse
-    session_id = "scrollscribe_session"
+    # Session logic: only set session_id if --session or --session-id is provided
+    session_id: str = ""
+    if getattr(args, "session_id", None):
+        session_id = args.session_id
+    elif getattr(args, "session", False):
+        session_id = "scrollscribe_session"
 
-    # 🚀 PERFORMANCE FIX 2: Configure with session_id
+    # Use exact config from original - preserves all functionality
     html_fetch_config = CrawlerRunConfig(
-        session_id=session_id,  # Enable session reuse!
+        session_id=session_id if session_id else "",  # Always pass a string
         cache_mode=CacheMode.DISABLED,
         wait_until=args.wait,
         page_timeout=args.timeout,
         markdown_generator=None,  # type: ignore[arg-type]
         extraction_strategy=None,  # type: ignore[arg-type]
-        verbose=args.verbose,
+        verbose=args.verbose,  # Respect user's verbose choice
         stream=False,
     )
 
-    # Same Rich progress setup as original
+    # Create the persistent Live display like original scrollscribe.py
     progress_columns = [
-        TextColumn("[cyan]Processing URLs"),
+        TextColumn("[#9ccfd8]Processing URLs"),
         BarColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("[#6e6a86]{task.percentage:>3.0f}%"),
         TextColumn("•"),
-        TextColumn("[cyan]{task.completed:>4d}[/]/[cyan]{task.total:>4d}[/]"),
+        TextColumn("[#908caa]{task.completed:>4d}[/]/[#908caa]{task.total:>4d}[/]"),
         TextColumn("•"),
         TimeElapsedColumn(),
         TextColumn("•"),
+        TextColumn("ETA"),
         TimeRemainingColumn(),
         TextColumn("•"),
         RateColumn(),
         TextColumn("•"),
         SpinnerColumn(),
     ]
-    progress = Progress(*progress_columns, console=console, transient=False)
+    progress = Progress(
+        *progress_columns, console=clean_console.console, transient=False
+    )
+
+    # Extract base URL from first URL for header
+    base_url = urls_to_scrape[0] if urls_to_scrape else "unknown"
+    clean_domain = base_url.replace("https://", "").replace("http://", "").split("/")[0]
+
+    # Use Rose Pine dark theme header format
     header_rule = Rule(
-        f"[bold blue]ScrollScribe | Model: {args.model}[/]", style="blue"
+        f"[bold #c4a7e7]ScrollScribe[/] | [bold #31748f]Scraping:[/] [bold #e0def4]{clean_domain}[/]",
+        style="#6e6a86",
     )
-    header_text = Text(
-        f"🧠 Filtering with: {args.model}", justify="center", style="dim"
-    )
+    header_text = Text(f"🧠 Model: {args.model}", justify="center", style="#9ccfd8")
     live_group = Group(header_rule, header_text, progress)
 
-    log.info(
-        f"{INFO_STYLE}Starting crawl for [bold]{len(urls_to_scrape)}[/] URLs...{STYLE_END}"
-    )
+    logger.info(f"Starting crawl for {len(urls_to_scrape)} URLs...")
     success_count: int = 0
     failed_count: int = 0
     shutdown_requested: bool = False
 
     try:
         with Live(
-            live_group, refresh_per_second=4, console=console, transient=False
+            live_group,
+            refresh_per_second=4,
+            console=clean_console.console,
+            transient=False,
         ) as live:
             async with AsyncWebCrawler(config=browser_config) as crawler:
                 crawl_task: TaskID = progress.add_task(
                     description="", total=len(urls_to_scrape)
                 )
 
-                # 🚀 PERFORMANCE FIX 3: Batch fetch with session
-                log.info(
-                    f"{INFO_STYLE}Batch fetching [bold]{len(urls_to_scrape)}[/] URLs with session reuse...{STYLE_END}"
+                # Batch fetch with session reuse (performance fix)
+                logger.info(
+                    f"Batch fetching {len(urls_to_scrape)} URLs with session reuse..."
                 )
                 all_results: list[CrawlResult] = cast(
                     "list[CrawlResult]",
                     await crawler.arun_many(urls_to_scrape, config=html_fetch_config),
                 )
 
-                # 🚀 PERFORMANCE FIX 4: Use batch results directly - NO duplicate fetching!
+                # Process each result - using CleanConsole for individual URL status
                 for loop_index, (url, result) in enumerate(
                     zip(urls_to_scrape, all_results, strict=True)
                 ):
                     if shutdown_requested:
-                        console.print(
-                            "[yellow][WARN] Shutdown requested, stopping processing...[/yellow]"
+                        clean_console.print_warning(
+                            "Shutdown requested, stopping processing..."
                         )
                         break
 
                     original_index: int = args.start_at + loop_index + 1
                     total_to_process: int = len(urls_to_scrape)
+                    url_start_time = time.time()
 
-                    log.info(
-                        f"{INFO_STYLE}Processing URL [yellow]{loop_index + 1}/{total_to_process}[/] (Overall: [yellow]{original_index}[/]): [link={url}]{url}[/link]{STYLE_END}"
+                    logger.info(
+                        f"Processing URL {loop_index + 1}/{total_to_process} (Overall: {original_index}): {url}"
                     )
 
                     try:
-                        # 🚀 PERFORMANCE FIX: Use result from batch - no duplicate fetching!
                         if result.success:
                             html_to_filter = result.cleaned_html or result.html
 
                             if not html_to_filter:
-                                log.warning(
-                                    f"{WARN_STYLE}HTML fetch succeeded but content is empty.{STYLE_END}"
-                                )
                                 failed_count += 1
+                                # Use CleanConsole for clean URL status
+                                clean_console.print_url_status(
+                                    url, "warning", 0, "empty content"
+                                )
                                 progress.update(crawl_task, advance=1)
                                 continue
 
-                            log.info(
-                                f"{INFO_STYLE}HTML fetched ([bold]{len(html_to_filter)}[/] chars). Sending to LLM filter ([blue]{args.model}[/])...{STYLE_END}"
+                            logger.info(
+                                f"HTML fetched ({len(html_to_filter)} chars). Sending to LLM filter ({args.model})..."
                             )
 
-                            # Use the fixed run_llm_filter with @retry_llm decorator
+                            # Use the properly decorated run_llm_filter
                             filtered_md: str | None = await run_llm_filter(
                                 filter_instance=llm_content_filter,
                                 html_content=html_to_filter,
+                                url=url,
                             )
 
                             if filtered_md:
                                 absolute_md = absolutify_links(filtered_md, url)
-
                                 filename: str = url_to_filename(url, original_index)
                                 filepath = output_dir / filename
+
                                 try:
                                     with open(filepath, "w", encoding="utf-8") as f:
                                         f.write(absolute_md)
 
-                                    log.info(
-                                        f"{INFO_STYLE}Saved: [cyan]{filepath}[/] ([bold]{len(absolute_md)}[/] chars){STYLE_END}"
-                                    )
-                                    console.print(
-                                        f"[green]✓ Saved:[/green] [cyan]{filepath.name}[/]"
+                                    url_time = time.time() - url_start_time
+                                    chars = len(absolute_md)
+
+                                    # Use CleanConsole for clean status display
+                                    clean_console.print_url_status(
+                                        url,
+                                        "success",
+                                        url_time,
+                                        f"{chars:,} chars → {filename}",
                                     )
                                     success_count += 1
-                                except OSError:
-                                    log.exception(
-                                        f"{ERROR_STYLE}Failed to save markdown for {url} to {filepath}{STYLE_END}"
-                                    )
-                                    console.print(
-                                        f"[bold red]✗ ERROR saving {filepath.name}[/bold red]"
-                                    )
-                                    failed_count += 1
-                            else:
-                                log.warning(
-                                    f"{WARN_STYLE}LLM filter returned no content for {url}. Skipping save.{STYLE_END}"
-                                )
-                                failed_count += 1
-                        else:
-                            log.error(
-                                f"{ERROR_STYLE}HTML fetch failed: {result.error_message or 'Unknown error'}{STYLE_END}"
-                            )
-                            failed_count += 1
 
-                        # Same delay as original
+                                except OSError:
+                                    failed_count += 1
+                                    logger.error(
+                                        f"Failed to save markdown for {url} to {filepath}"
+                                    )
+                                    clean_console.print_url_status(
+                                        url, "error", 0, "save failed"
+                                    )
+                            else:
+                                failed_count += 1
+                                clean_console.print_url_status(
+                                    url, "warning", 0, "no LLM content"
+                                )
+                        else:
+                            failed_count += 1
+                            error_msg = result.error_message or "Unknown error"
+                            logger.error(f"HTML fetch failed: {error_msg}")
+                            clean_console.print_url_status(url, "error", 0, error_msg)
+
+                        # Delay between requests
                         delay_seconds: float = 1.0
-                        log.info(
-                            f"{INFO_STYLE}Waiting [yellow]{delay_seconds}[/] seconds...{STYLE_END}"
-                        )
                         await asyncio.sleep(delay_seconds)
 
                     except KeyboardInterrupt:
                         live.stop()
-                        console.print(
-                            "\n[bold yellow]KeyboardInterrupt caught during URL processing. Signaling shutdown...[/bold yellow]"
+                        clean_console.print_warning(
+                            "KeyboardInterrupt caught during URL processing. Signaling shutdown..."
                         )
                         shutdown_requested = True
 
-                    except Exception:
-                        log.exception(
-                            f"{ERROR_STYLE}Unexpected error processing {url}{STYLE_END}"
-                        )
-                        console.print(f"[bold red]✗ ERROR processing {url}[/bold red]")
+                    except Exception as exc:
                         failed_count += 1
+                        logger.error(f"Unexpected error processing {url}: {exc}")
+
+                        # Use proper exception handling
+                        if isinstance(exc, LLMError | ProcessingError):
+                            clean_console.print_url_status(url, "error", 0, str(exc))
+                        else:
+                            clean_console.print_url_status(
+                                url, "error", 0, "unexpected error"
+                            )
+
                         await asyncio.sleep(1.0)
 
                     if not shutdown_requested:
                         progress.update(crawl_task, advance=1)
 
     except KeyboardInterrupt:
-        console.print(
-            "\n[bold yellow]KeyboardInterrupt caught outside main loop. Shutting down...[/bold yellow]"
+        clean_console.print_warning(
+            "KeyboardInterrupt caught outside main loop. Shutting down..."
         )
 
     finally:
-        console.print(
-            f"\n[bold green]ScrollScribe finished processing. Saved: {success_count}. Failed/Skipped: {failed_count}.[/bold green]"
+        total_time = time.time() - start_time
+
+        # Use CleanConsole for final summary
+        clean_console.print_summary(success_count, failed_count, total_time)
+
+        # Also log for structured logging
+        logger.info(
+            f"ScrollScribe finished processing. Saved: {success_count}. Failed/Skipped: {failed_count}."
         )
 
     return success_count, failed_count
