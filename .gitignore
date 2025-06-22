@@ -28,6 +28,7 @@ data/mydata
 data/session/
 output/testes
 tests/
+REFACTOR/
 
 data/urls
 plans/
