@@ -18,7 +18,7 @@ from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
 from rich.panel import Panel
 
-from .config import get_browser_config, silence_noisy_libraries
+from .config import get_browser_config
 from .discovery import extract_links, save_links_to_file
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
@@ -104,7 +104,7 @@ def setup_scrape_parser(subparsers) -> None:
     )
     scrape_parser.add_argument(
         "--model",
-        default="openrouter/google/gemini-2.0-flash-exp:free",
+        default="openrouter/google/mistralai/codestral-2501",
         help="LLM model to use for filtering",
     )
     scrape_parser.add_argument(
@@ -318,7 +318,7 @@ async def scrape_command(args) -> int:
     if args.fast:
         console.print_info("🚀 Fast mode enabled - using crawl4ai only (no LLM)")
         from .fast_processing import process_urls_fast
-        
+
         try:
             success_count, failed_count = await process_urls_fast(
                 urls_to_scrape=urls_to_scrape,
@@ -326,10 +326,10 @@ async def scrape_command(args) -> int:
                 output_dir=output_dir,
                 browser_config=browser_config,
             )
-            
+
             # Return success if we processed at least some URLs
             return 0 if success_count > 0 else 1
-            
+
         except KeyboardInterrupt:
             console.print_warning("KeyboardInterrupt caught in fast mode. Exiting.")
             return 1
