@@ -27,8 +27,6 @@ from .utils.logging import CleanConsole, set_logging_verbosity
 # Load environment variables from .env file
 load_dotenv()
 
-# Silence noisy libraries ASAP
-silence_noisy_libraries()
 
 console = CleanConsole()
 
