@@ -16,36 +16,35 @@ from pathlib import Path
 from crawl4ai import LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
-from rich.console import Console
+from rich.panel import Panel
 
-from .config import get_browser_config
+from .config import get_browser_config, silence_noisy_libraries
 from .discovery import extract_links, save_links_to_file
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
-from rich.panel import Panel
+from .utils.logging import CleanConsole, set_logging_verbosity
 
 # Load environment variables from .env file
 load_dotenv()
 
-console = Console(force_terminal=True, color_system="truecolor")
+# Silence noisy libraries ASAP
+silence_noisy_libraries()
+
+console = CleanConsole()
 
 
 def setup_base_parser() -> argparse.ArgumentParser:
-    """Create the base argument parser."""
+    """Create the base argument parser with beautiful Rich formatting."""
     parser = argparse.ArgumentParser(
-        description="ScrollScribe V2 - AI-powered documentation scraper",
+        prog="scrollscribe",
+        description="🚀 ScrollScribe V2 - AI-powered documentation scraper\n\nTransform any documentation website into clean, filtered Markdown files using advanced LLM processing.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Discover URLs only
-  python -m app discover https://docs.example.com/ -o urls.txt
-
-  # Scrape from URL list
-  python -m app scrape urls.txt -o output/
-
-  # Unified pipeline
-  python -m app process https://docs.example.com/ -o output/
-        """,
+        epilog="\nExamples:\n\n  # Discover URLs from documentation site\n  scrollscribe discover https://docs.python.org/3/ -o python_urls.txt\n",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging for troubleshooting and verbose output.",
     )
     return parser
 
@@ -126,6 +125,22 @@ def setup_scrape_parser(subparsers) -> None:
         help="Max output tokens for the LLM filtering",
     )
     scrape_parser.add_argument(
+        "--session",
+        action="store_true",
+        help="Enable browser session reuse (sets session_id to 'scrollscribe_session')",
+    )
+    scrape_parser.add_argument(
+        "--session-id",
+        type=str,
+        default=None,
+        help="Custom session_id for browser session reuse (overrides --session)",
+    )
+    scrape_parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Enable fast HTML→Markdown mode (50-200 docs/min, no LLM filtering)",
+    )
+    scrape_parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -171,7 +186,7 @@ def setup_process_parser(subparsers) -> None:
     )
     process_parser.add_argument(
         "--model",
-        default="openrouter/google/gemini-2.0-flash-exp:free",
+        default="openrouter/mistralai/codestral-2501",
         help="LLM model to use for filtering",
     )
     process_parser.add_argument(
@@ -192,6 +207,22 @@ def setup_process_parser(subparsers) -> None:
         help="Max output tokens for the LLM filtering",
     )
     process_parser.add_argument(
+        "--session",
+        action="store_true",
+        help="Enable browser session reuse (sets session_id to 'scrollscribe_session')",
+    )
+    process_parser.add_argument(
+        "--session-id",
+        type=str,
+        default=None,
+        help="Custom session_id for browser session reuse (overrides --session)",
+    )
+    process_parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Enable fast HTML→Markdown mode (50-200 docs/min, no LLM filtering)",
+    )
+    process_parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -200,86 +231,73 @@ def setup_process_parser(subparsers) -> None:
 
 
 async def discover_command(args) -> int:
-    """Execute the discover command."""
-    console.print("[cyan][INFO] Starting Link Discovery...[/cyan]")
-    console.print(f"[cyan][INFO] Start URL:[/cyan] {args.start_url}")
-    console.print(f"[cyan][INFO] Output File:[/cyan] {args.output_file}")
+    """Execute the discover command with CleanConsole."""
+    from .utils.logging import CleanConsole
+
+    console = CleanConsole()
+    console.print_info(f"Starting Link Discovery from: {args.start_url}")
+    console.print_info(f"Output file: {args.output_file}")
 
     try:
         found_urls: set[str] = extract_links(args.start_url, args.verbose)
 
         if found_urls:
             save_links_to_file(found_urls, args.output_file, args.verbose)
-            console.print("[cyan][INFO] Discovery finished.[/cyan]")
+            console.print_info(f"Discovery finished. Found {len(found_urls)} URLs.")
             return 0
         else:
-            console.print("[yellow][WARN] No valid URLs extracted.[/yellow]")
+            console.print_warning("No valid URLs extracted.")
             return 1
     except Exception as e:
-        console.print(f"[bold red][ERROR] Discovery failed: {e}[/bold red]")
+        console.print_error(f"Discovery failed: {e}")
         return 1
 
 
 async def scrape_command(args) -> int:
-    """Execute the scrape command."""
-    # Same setup as original scrollscribe.py
-    import logging
+    """Execute the scrape command with proper logging integration."""
 
-    from rich.logging import RichHandler
+    # Use YOUR logging system instead of setting up own RichHandler
+    from .utils.exceptions import ConfigError, FileIOError
+    from .utils.logging import CleanConsole
 
-    # Configure logging (same as original)
-    rich_handler = RichHandler(
-        console=console,
-        rich_tracebacks=True,
-        markup=True,
-        show_path=False,
-    )
+    console = CleanConsole()
 
-    logging.basicConfig(
-        level=logging.INFO if args.verbose else logging.WARNING,
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[rich_handler],
-        force=True,
-    )
+    # Fast mode doesn't need API key
+    if not args.fast:
+        # Check API key for LLM mode
+        api_key: str | None = os.getenv(args.api_key_env)
+        if not api_key:
+            raise ConfigError(
+                f"API key env var '{args.api_key_env}' not found!",
+                config_key=args.api_key_env,
+                suggested_fix=f"Set {args.api_key_env}=your_api_key in your .env file or environment.",
+            )
+    # Internal logging removed to avoid duplicate with user-facing message in process_command
 
-    # Quiet litellm
-    litellm_logger = logging.getLogger("litellm")
-    litellm_logger.setLevel(logging.ERROR)
-
-    # Check API key using ConfigError
-    api_key: str | None = os.getenv(args.api_key_env)
-    if not api_key:
-        raise ConfigError(
-            f"API key env var '{args.api_key_env}' not found!",
-            config_key=args.api_key_env,
-            suggested_fix=f"Set the environment variable: export {args.api_key_env}=your_api_key",
-        )
-
-    # Read URLs
     try:
+        # Read URLs using proper exception handling
         all_urls: list[str] = read_urls_from_file(args.input_file)
-    except SystemExit:
+    except FileIOError as e:
+        console.print_error(f"File error: {str(e)}")
+        return 1
+    except Exception as e:
+        console.print_error(f"Unexpected error reading URLs: {e}")
         return 1
 
     # Validate start-at
     if args.start_at < 0:
-        console.print(
-            "[yellow][WARN] --start-at cannot be negative. Starting from 0.[/yellow]"
-        )
+        console.print_warning("--start-at cannot be negative. Starting from 0.")
         args.start_at = 0
     elif args.start_at >= len(all_urls):
-        console.print(
-            f"[bold red][ERROR] --start-at index {args.start_at} is out of bounds for {len(all_urls)} URLs.[/bold red]"
+        console.print_error(
+            f"--start-at index {args.start_at} is out of bounds for {len(all_urls)} URLs."
         )
         return 1
 
     urls_to_scrape: list[str] = all_urls[args.start_at :]
 
     if not urls_to_scrape:
-        console.print(
-            f"[bold red][ERROR] No URLs left to process after --start-at {args.start_at}[/bold red]"
-        )
+        console.print_error(f"No URLs left to process after --start-at {args.start_at}")
         return 1
 
     # Create output directory
@@ -287,13 +305,40 @@ async def scrape_command(args) -> int:
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
-        console.print(
-            f"[bold red][ERROR] Could not create output dir {output_dir}[/bold red]"
-        )
+        console.print_error(f"Could not create output dir {output_dir}")
         return 1
 
-    # Setup browser config
-    browser_config = get_browser_config(headless=True, verbose=args.verbose)
+    set_logging_verbosity(getattr(args, "debug", False))
+
+    browser_config = get_browser_config(
+        headless=True, verbose=getattr(args, "debug", False)
+    )
+
+    # Check if fast mode is enabled
+    if args.fast:
+        console.print_info("🚀 Fast mode enabled - using crawl4ai only (no LLM)")
+        from .fast_processing import process_urls_fast
+        
+        try:
+            success_count, failed_count = await process_urls_fast(
+                urls_to_scrape=urls_to_scrape,
+                args=args,
+                output_dir=output_dir,
+                browser_config=browser_config,
+            )
+            
+            # Return success if we processed at least some URLs
+            return 0 if success_count > 0 else 1
+            
+        except KeyboardInterrupt:
+            console.print_warning("KeyboardInterrupt caught in fast mode. Exiting.")
+            return 1
+        except Exception as e:
+            console.print_error(f"Fast mode error: {e}")
+            return 1
+
+    # Regular LLM mode (existing code)
+    api_key = os.getenv(args.api_key_env)  # We already checked this exists above
 
     # Setup LLM config and filter
     llm_config = LLMConfig(
@@ -329,10 +374,10 @@ async def scrape_command(args) -> int:
         llm_config=llm_config,
         instruction=llm_filter_instruction,
         chunk_token_threshold=args.max_tokens,
-        verbose=args.verbose,
+        verbose=False,  # Always disable to reduce noise
     )
 
-    # Process URLs with performance fixes
+    # Process URLs with the fixed processing function
     try:
         success_count, failed_count = await process_urls_batch(
             urls_to_scrape=urls_to_scrape,
@@ -346,57 +391,83 @@ async def scrape_command(args) -> int:
         return 0 if success_count > 0 else 1
 
     except KeyboardInterrupt:
-        console.print("\n[bold yellow]KeyboardInterrupt caught. Exiting.[/bold yellow]")
+        console.print_warning("KeyboardInterrupt caught. Exiting.")
         return 1
     except Exception as e:
-        console.print(f"[bold red][CRITICAL] Unhandled error: {e}[/bold red]")
+        console.print_error(f"Unhandled error: {e}")
         return 1
 
 
 async def process_command(args) -> int:
     """Execute the unified process command (discover + scrape)."""
-    console.print("[cyan][INFO] Starting unified process (discover + scrape)...[/cyan]")
-
-    # Step 1: Discovery
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp_file:
-        temp_file_path = tmp_file.name
+    console.print_info("Starting unified process (discover + scrape)...")
 
     try:
-        # Create args for discover command
-        discover_args = argparse.Namespace(
-            start_url=args.start_url, output_file=temp_file_path, verbose=args.verbose
-        )
+        # Step 1: Discovery
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as tmp_file:
+            temp_file_path = tmp_file.name
 
-        discover_result = await discover_command(discover_args)
-        if discover_result != 0:
-            console.print("[bold red][ERROR] Discovery phase failed[/bold red]")
-            return discover_result
-
-        # Step 2: Scrape
-        # Create args for scrape command
-        scrape_args = argparse.Namespace(
-            input_file=temp_file_path,
-            start_at=args.start_at,
-            output_dir=args.output_dir,
-            prompt=args.prompt,
-            timeout=args.timeout,
-            wait=args.wait,
-            model=args.model,
-            api_key_env=args.api_key_env,
-            base_url=args.base_url,
-            max_tokens=args.max_tokens,
-            verbose=args.verbose,
-        )
-
-        scrape_result = await scrape_command(scrape_args)
-        return scrape_result
-
-    finally:
-        # Clean up temp file
         try:
-            os.unlink(temp_file_path)
-        except OSError:
-            pass
+            # Create args for discover command
+            discover_args = argparse.Namespace(
+                start_url=args.start_url,
+                output_file=temp_file_path,
+                verbose=args.verbose,
+            )
+
+            discover_result = await discover_command(discover_args)
+            if discover_result != 0:
+                console.print_error("Discovery phase failed")
+                return discover_result
+
+            # Step 2: Scrape
+            # Check API key before scraping (only needed for LLM mode)
+            if not args.fast:
+                api_key: str | None = os.getenv(args.api_key_env)
+                if not api_key:
+                    raise ConfigError(
+                        f"API key env var '{args.api_key_env}' not found!",
+                        config_key=args.api_key_env,
+                        suggested_fix=f"Set {args.api_key_env}=your_api_key in your .env file or environment.",
+                    )
+                console.print_info(
+                    f"🔑 Found API key in env var: [bold lime]{args.api_key_env}[/bold lime]"
+                )
+            else:
+                console.print_info("⚡ Fast mode enabled - no API key needed")
+            # Only log once, not here and in scrape_command
+
+            # Create args for scrape command
+            scrape_args = argparse.Namespace(
+                input_file=temp_file_path,
+                start_at=args.start_at,
+                output_dir=args.output_dir,
+                prompt=args.prompt,
+                timeout=args.timeout,
+                wait=args.wait,
+                model=args.model,
+                api_key_env=args.api_key_env,
+                base_url=args.base_url,
+                max_tokens=args.max_tokens,
+                fast=args.fast,  # Pass through the fast flag
+                verbose=args.verbose,
+            )
+
+            scrape_result = await scrape_command(scrape_args)
+            return scrape_result
+
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                pass
+
+    except ConfigError as e:
+        console.print_error(e.get_help_message())
+        return 1
 
 
 def main() -> int:
@@ -427,10 +498,14 @@ def main() -> int:
             if isinstance(ce, ConfigError)
             else "[bold red]FILE ERROR[/bold red]"
         )
-        help_message = (
-            ce.get_help_message() if hasattr(ce, "get_help_message") else str(ce)
-        )
-        console.print(
+        # Only call get_help_message if it exists and is callable
+        if hasattr(ce, "get_help_message") and callable(
+            getattr(ce, "get_help_message", None)
+        ):
+            help_message = ce.get_help_message()  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            help_message = str(ce)
+        console.console.print(
             Panel(
                 help_message,
                 title=panel_title,
