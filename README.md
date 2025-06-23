@@ -1,4 +1,6 @@
-# ScrollScribeAI :scroll: Turn Any Documentation Site into Searchable Markdown Files
+# ScrollScribeAI :scroll: Docs Web Scraper
+## Turn Any Documentation Site into Searchable Markdown Files
+
 
 **Convert any documentation website into clean, searchable Markdown files.**
 
