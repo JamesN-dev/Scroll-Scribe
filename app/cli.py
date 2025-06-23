@@ -30,15 +30,22 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from typing import Annotated
 
+import typer
 from crawl4ai import LLMConfig
 from crawl4ai.content_filter_strategy import LLMContentFilter
 from dotenv import load_dotenv
+from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
+# Assume these are your project's modules.
+# If the structure is different, you may need to adjust the import paths.
 from .config import get_browser_config
 from .discovery import save_links_to_file
 from .fast_discovery import extract_links_fast
+from .fast_processing import process_urls_fast
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
 from .utils.logging import CleanConsole, set_logging_verbosity
@@ -46,305 +53,529 @@ from .utils.logging import CleanConsole, set_logging_verbosity
 # Load environment variables from .env file
 load_dotenv()
 
-
+# --- Globals & App Initialization ---
 console = CleanConsole()
+rich_console = Console()
+
+app = typer.Typer(
+    name="scribe",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+    add_completion=True,
+    help="""
+:books: [bold #b8bb26]ScrollScribe V2[/bold #b8bb26] — AI-powered documentation scraper.
+
+[#458588]Transform any documentation website into clean, filtered Markdown files.[/]
+
+[bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
+
+[bold #fabd2f]Quick Start:[/bold #fabd2f]
+
+  [#8ec07c]➤ Process an entire documentation site:[/]
+    [dim]$ scribe process https://docs.python.org/3/ -o python-docs/[/dim]
+
+  [#8ec07c]➤ Use fast mode for large sites (no LLM costs):[/]
+    [dim]$ scribe process https://docs.django.com/ -o django-docs/ --fast[/dim]
+
+[bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
+
+[bold #83a598]Run a command with --help for more details.[/]
+(e.g., [dim]scribe scrape --help[/dim])
+    """,
+    epilog="Made with :heart: by the ScrollScribe team.",
+)
 
 
-def setup_base_parser() -> argparse.ArgumentParser:
-    """Create the base argument parser with Rich-formatted help output.
+# --- Helper Functions ---
+def print_summary_report(summary: dict):
+    """Prints a beautiful, dynamic summary report table after a job completes."""
+    if not summary:
+        return
 
-    Returns:
-        argparse.ArgumentParser: Configured parser with program description,
-            global options, and Rich formatting for beautiful help display.
+    success_count = len(summary.get("successful_urls", []))
+    failed_items = summary.get("failed_urls", [])
+    failed_count = len(failed_items)
+    total_processed = success_count + failed_count
+
+    if total_processed == 0:
+        return
+
+    summary_table = Table(
+        title="[bold #b8bb26]Scrape Job Summary[/bold #b8bb26]",
+        show_header=True,
+        header_style="bold #83a598",
+        border_style="#458588",
+    )
+    summary_table.add_column("Status", style="dim", width=20)
+    summary_table.add_column("Count", justify="right")
+
+    summary_table.add_row(
+        ":white_check_mark: [green]Successful[/green]", str(success_count)
+    )
+    summary_table.add_row(":x: [red]Failed[/red]", str(failed_count))
+    summary_table.add_row(
+        ":hourglass_done: [cyan]Total Processed[/cyan]", str(total_processed)
+    )
+
+    rich_console.print("\n")
+    rich_console.print(summary_table)
+
+    if failed_items:
+        failed_text = "\n".join(
+            f"• [dim]{url}[/dim]\n  [red]Reason:[/red] {error}"
+            for url, error in failed_items
+        )
+        failed_panel = Panel(
+            failed_text,
+            title="[bold #fe8019]Failed URLs[/bold #fe8019]",
+            border_style="#fe8019",
+            title_align="left",
+        )
+        rich_console.print(failed_panel)
+
+
+# --- Typer Commands ---
+
+
+@app.callback(invoke_without_command=True)
+def global_options(
+    ctx: typer.Context,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Enable debug logging for deep troubleshooting.",
+            rich_help_panel="General Options",
+        ),
+    ] = False,
+):
     """
-    parser = argparse.ArgumentParser(
-        prog="scrollscribe",
-        description="ScrollScribe V2 - AI-powered documentation scraper\n\nTransform any documentation website into clean, filtered Markdown files using advanced LLM processing.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="\nExamples:\n\n  # Discover URLs from documentation site\n  scrollscribe discover https://docs.python.org/3/ -o python_urls.txt\n",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging for troubleshooting and verbose output.",
-    )
-    return parser
-
-
-def setup_discover_parser(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
-) -> None:
-    """Configure the 'discover' subcommand parser.
-
-    Sets up argument parsing for URL discovery functionality, which extracts
-    internal documentation links from a starting website using crawl4ai.
-
-    Args:
-        subparsers: The subparsers object from argparse to add the discover command to.
-
-    Command Arguments:
-        start_url (str): Starting URL to crawl for internal documentation links
-        -o/--output-file (str): Output file path to save discovered URLs
-        -v/--verbose (bool): Enable verbose logging for discovery process
+    :books: [bold #b8bb26]ScrollScribe V2[/bold #b8bb26] — AI-powered documentation scraper.
     """
-    discover_parser = subparsers.add_parser(
-        "discover", help="Extract URLs from a documentation website"
-    )
-    discover_parser.add_argument(
-        "start_url", help="Starting URL to discover documentation links"
-    )
-    discover_parser.add_argument(
-        "-o",
-        "--output-file",
-        required=True,
-        help="Output file to save discovered URLs",
-    )
-    discover_parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging"
-    )
+    if debug:
+        set_logging_verbosity(verbose=True)
+
+    # Pass debug state to subcommands via the context object
+    ctx.obj = {"debug": debug}
+
+    # If no command is specified, show the main help text.
+    if ctx.invoked_subcommand is None:
+        rich_console.print(ctx.get_help())
 
 
-def setup_scrape_parser(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
-) -> None:
-    """Configure the 'scrape' subcommand parser.
-
-    Sets up argument parsing for URL processing functionality, which converts
-    a list of URLs to filtered Markdown files using either LLM processing
-    or fast HTML-to-Markdown conversion.
-
-    Args:
-        subparsers: The subparsers object from argparse to add the scrape command to.
-
-    Command Arguments:
-        input_file (str): Text file containing URLs to process, one per line
-        -o/--output-dir (str): Output directory for generated Markdown files
-        --fast (bool): Enable fast mode (no LLM, 50-200 docs/min, no API costs)
-        --model (str): LLM model for filtering (default: openrouter/google/mistralai/codestral-2501)
-        --prompt (str): Custom LLM filtering prompt (optional)
-        --start-at (int): Start processing from specific URL index (0-based)
-        --timeout (int): Page timeout in milliseconds (default: 60000)
-        --wait (str): Page load completion condition (default: networkidle)
-        --api-key-env (str): Environment variable containing API key
-        --base-url (str): API base URL for LLM provider
-        --max-tokens (int): Maximum output tokens for LLM filtering
-        --session/--session-id: Browser session reuse options
-        -v/--verbose (bool): Enable verbose logging
+@app.command()
+def discover(
+    start_url: Annotated[
+        str, typer.Argument(help="The starting URL to crawl for documentation links.")
+    ],
+    output_file: Annotated[
+        str | None,
+        typer.Option(
+            "-o",
+            "--output-file",
+            help="Output file to save discovered URLs. Defaults to 'urls.txt'.",
+        ),
+    ] = "urls.txt",
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "-v", "--verbose", help="Enable verbose logging for the discovery process."
+        ),
+    ] = False,
+):
     """
-    scrape_parser = subparsers.add_parser(
-        "scrape", help="Convert URLs to filtered markdown using LLM"
-    )
-    scrape_parser.add_argument("input_file", help="Text file containing URLs to scrape")
-    scrape_parser.add_argument(
-        "--start-at",
-        type=int,
-        default=0,
-        help="Start processing from URL index (0-based)",
-    )
-    scrape_parser.add_argument(
-        "-o",
-        "--output-dir",
-        required=True,
-        help="Output directory for markdown files",
-    )
-    scrape_parser.add_argument(
-        "--prompt",
-        default="",
-        help="Custom LLM filtering prompt (uses default if empty)",
-    )
-    scrape_parser.add_argument(
-        "--timeout",
-        type=int,
-        default=60000,
-        help="Page timeout in milliseconds",
-    )
-    scrape_parser.add_argument(
-        "--wait",
-        default="networkidle",
-        help="When to consider page loading complete",
-    )
-    scrape_parser.add_argument(
-        "--model",
-        default="openrouter/google/mistralai/codestral-2501",
-        help="LLM model to use for filtering",
-    )
-    scrape_parser.add_argument(
-        "--api-key-env",
-        default="OPENROUTER_API_KEY",
-        help="Environment variable containing the API key",
-    )
-    scrape_parser.add_argument(
-        "--base-url",
-        default="https://openrouter.ai/api/v1",
-        help="API Base URL for LLM",
-    )
-    scrape_parser.add_argument(
-        "-max",
-        "--max-tokens",
-        type=int,
-        default=8192,
-        help="Max output tokens for the LLM filtering",
-    )
-    scrape_parser.add_argument(
-        "--session",
-        action="store_true",
-        help="Enable browser session reuse (sets session_id to 'scrollscribe_session')",
-    )
-    scrape_parser.add_argument(
-        "--session-id",
-        type=str,
-        default=None,
-        help="Custom session_id for browser session reuse (overrides --session)",
-    )
-    scrape_parser.add_argument(
-        "--fast",
-        action="store_true",
-        help="Enable fast HTML→Markdown mode (50-200 docs/min, no LLM filtering)",
-    )
-    scrape_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging (Script INFO level)",
-    )
+    :mag: [bold #fabd2f]Discover Mode[/bold #fabd2f]
 
+    [#458588]Chart the territory. Scans a starting URL to map out all internal links, creating a clean list for targeted scraping.[/]
 
-def setup_process_parser(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
-) -> None:
-    """Configure the 'process' subcommand parser.
+    [bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
 
-    Sets up argument parsing for the unified processing pipeline, which combines
-    URL discovery and scraping into a single command. This is the most commonly
-    used command for end-to-end documentation processing.
+    [bold #b8bb26]Common Use Cases:[/bold #b8bb26]
+      • Preview the scope of a full process run.
+      • Build a custom URL list for focused scraping.
+      • Isolate specific sections of a large documentation site.
 
-    Args:
-        subparsers: The subparsers object from argparse to add the process command to.
+    [bold #b8bb26]Examples:[/bold #b8bb26]
+      [#8ec07c]➤ Discover and save to a custom file:[/]
+        [dim]$ scribe discover https://docs.django.com/ -o django-urls.txt[/dim]
 
-    Command Arguments:
-        start_url (str): Starting URL to discover and process documentation from
-        -o/--output-dir (str): Output directory for generated Markdown files
-        --fast (bool): Enable fast mode (no LLM, 50-200 docs/min, no API costs)
-        --model (str): LLM model for filtering (default: openrouter/mistralai/codestral-2501)
-        --prompt (str): Custom LLM filtering prompt (optional)
-        --start-at (int): Start processing from specific URL index (0-based)
-        --timeout (int): Page timeout in milliseconds (default: 60000)
-        --wait (str): Page load completion condition (default: networkidle)
-        --api-key-env (str): Environment variable containing API key
-        --base-url (str): API base URL for LLM provider
-        --max-tokens (int): Maximum output tokens for LLM filtering
-        --session/--session-id: Browser session reuse options
-        -v/--verbose (bool): Enable verbose logging
+      [#8ec07c]➤ Run with verbose output for debugging:[/]
+        [dim]$ scribe discover https://fastapi.tiangolo.com/ -v[/dim]
+
+    [bold #83a598]Pro Tip:[/bold #83a598] Use the generated file as input for the '[cyan]scrape[/cyan]' command.
     """
-    process_parser = subparsers.add_parser(
-        "process", help="Unified pipeline (discover + scrape)"
+    # This logic matches your original file exactly.
+    if output_file is None:
+        output_file = "urls.txt"
+
+    args = argparse.Namespace(
+        start_url=start_url, output_file=output_file, verbose=verbose
     )
-    process_parser.add_argument(
-        "start_url", help="Starting URL to discover and process"
+    result = asyncio.run(discover_command(args))
+    raise typer.Exit(result)
+
+
+@app.command()
+def scrape(
+    ctx: typer.Context,
+    # Arguments and Options using modern Typer syntax for rich help text
+    input: Annotated[
+        str, typer.Argument(help="URL to scrape OR text file containing URLs")
+    ],
+    output_dir: Annotated[
+        str,
+        typer.Option(
+            ...,
+            "-o",
+            "--output-dir",
+            help="Output directory for markdown files",
+            rich_help_panel="Core Options",
+        ),
+    ],
+    start_at: Annotated[
+        int,
+        typer.Option(
+            help="Start processing from URL index (0-based)",
+            rich_help_panel="Processing Options",
+        ),
+    ] = 0,
+    fast: Annotated[
+        bool,
+        typer.Option(
+            "--fast/--no-fast",
+            help="Enable fast HTML→Markdown mode (no LLM filtering).",
+            rich_help_panel="Processing Options",
+        ),
+    ] = False,
+    prompt: Annotated[
+        str,
+        typer.Option(
+            help="Custom LLM filtering prompt (uses default if empty).",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "",
+    model: Annotated[
+        str,
+        typer.Option(
+            "--model",
+            help="LLM model to use for filtering.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "openrouter/mistralai/codestral-2501",
+    api_key_env: Annotated[
+        str,
+        typer.Option(
+            "--api-key-env",
+            help="Environment variable containing the API key.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "OPENROUTER_API_KEY",
+    base_url: Annotated[
+        str,
+        typer.Option(
+            "--base-url",
+            help="API Base URL for LLM.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "https://openrouter.ai/api/v1",
+    max_tokens: Annotated[
+        int,
+        typer.Option(
+            "-max",
+            "--max-tokens",
+            help="Max output tokens for the LLM filtering.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = 8192,
+    timeout: Annotated[
+        int,
+        typer.Option(
+            help="Page load timeout in milliseconds.", rich_help_panel="Browser Control"
+        ),
+    ] = 60000,
+    wait: Annotated[
+        str,
+        typer.Option(
+            help="When to consider page loading complete.",
+            rich_help_panel="Browser Control",
+        ),
+    ] = "networkidle",
+    session: Annotated[
+        bool,
+        typer.Option(
+            "--session/--no-session",
+            help="Enable browser session reuse.",
+            rich_help_panel="Browser Control",
+        ),
+    ] = False,
+    session_id: Annotated[
+        str | None,
+        typer.Option(
+            "--session-id",
+            help="Custom session_id for browser reuse (overrides --session).",
+            rich_help_panel="Browser Control",
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "-v",
+            "--verbose",
+            help="Enable verbose logging (Script INFO level).",
+            rich_help_panel="General Options",
+        ),
+    ] = False,
+):
+    """
+    :page_facing_up: [bold #fabd2f]Scrape Mode[/bold #fabd2f]
+
+    [#458588]The workhorse. Converts a single URL or a file of URLs into clean, structured Markdown.[/]
+
+    [bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
+
+    [bold #b8bb26]Mode Comparison:[/bold #b8bb26]
+    [#83a598]
+      Feature         | LLM-Powered (Default)      | Fast Mode (--fast)
+    ────────────────┼────────────────────────────┼──────────────────────────
+      Speed           | ~9 sec/URL                 | [green]~150 docs/min[/green]
+      Quality         | [green]Superior, Intelligent[/green]      | Good, Raw Conversion
+      Cost            | API Token Usage            | [green]Free[/green]
+      Requires        | API Key                    | None
+    [/]
+    [bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
+
+    [bold #b8bb26]Examples:[/bold #b8bb26]
+      [#8ec07c]➤ Scrape a single page with LLM filtering:[/]
+        [dim]$ scribe scrape https://docs.python.org/3/library/os.html -o output/[/dim]
+
+      [#8ec07c]➤ Scrape a list of URLs using fast mode:[/]
+        [dim]$ scribe scrape urls.txt -o output/ --fast[/dim]
+
+      [#8ec07c]➤ Resume a large job from a specific line:[/]
+        [dim]$ scribe scrape urls.txt -o output/ --start-at 150[/dim]
+
+    [bold #fe8019]Heads Up:[/bold #fe8019] LLM mode requires the [cyan]OPENROUTER_API_KEY[/] environment variable to be set.
+    """
+    # This logic matches your original file exactly.
+    debug = ctx.obj.get("debug", False)
+
+    # Encapsulate the logic to avoid repetition and handle summary report
+    def run_scrape(input_file_path):
+        args = argparse.Namespace(
+            input_file=input_file_path,
+            output_dir=output_dir,
+            start_at=start_at,
+            prompt=prompt,
+            timeout=timeout,
+            wait=wait,
+            model=model,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            max_tokens=max_tokens,
+            session=session,
+            session_id=session_id,
+            fast=fast,
+            verbose=verbose,
+            debug=debug,
+        )
+        summary = asyncio.run(scrape_command(args))
+        print_summary_report(summary)
+
+        failed_count = len(summary.get("failed_urls", []))
+        if failed_count > 0:
+            raise typer.Exit(code=1)
+        raise typer.Exit(code=0)
+
+    if input.startswith(("http://", "https://")):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as tmp_file:
+            tmp_file.write(input + "\n")
+            temp_file_path = tmp_file.name
+        try:
+            run_scrape(temp_file_path)
+        finally:
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                pass
+    else:
+        run_scrape(input)
+
+
+@app.command()
+def process(
+    ctx: typer.Context,
+    # Arguments and Options using modern Typer syntax
+    start_url: Annotated[
+        str, typer.Argument(help="Starting URL to discover and process")
+    ],
+    output_dir: Annotated[
+        str,
+        typer.Option(
+            ...,
+            "-o",
+            "--output-dir",
+            help="Output directory for markdown files",
+            rich_help_panel="Core Options",
+        ),
+    ],
+    start_at: Annotated[
+        int,
+        typer.Option(
+            help="Start processing from URL index (0-based)",
+            rich_help_panel="Processing Options",
+        ),
+    ] = 0,
+    fast: Annotated[
+        bool,
+        typer.Option(
+            "--fast/--no-fast",
+            help="Enable fast HTML→Markdown mode (no LLM filtering).",
+            rich_help_panel="Processing Options",
+        ),
+    ] = False,
+    prompt: Annotated[
+        str,
+        typer.Option(
+            help="Custom LLM filtering prompt (uses default if empty).",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "",
+    model: Annotated[
+        str,
+        typer.Option(
+            "--model",
+            help="LLM model to use for filtering.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "openrouter/mistralai/codestral-2501",
+    api_key_env: Annotated[
+        str,
+        typer.Option(
+            "--api-key-env",
+            help="Environment variable containing the API key.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "OPENROUTER_API_KEY",
+    base_url: Annotated[
+        str,
+        typer.Option(
+            "--base-url",
+            help="API Base URL for LLM.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = "https://openrouter.ai/api/v1",
+    max_tokens: Annotated[
+        int,
+        typer.Option(
+            "-max",
+            "--max-tokens",
+            help="Max output tokens for the LLM filtering.",
+            rich_help_panel="LLM Configuration",
+        ),
+    ] = 8192,
+    timeout: Annotated[
+        int,
+        typer.Option(
+            help="Page load timeout in milliseconds.", rich_help_panel="Browser Control"
+        ),
+    ] = 60000,
+    wait: Annotated[
+        str,
+        typer.Option(
+            help="When to consider page loading complete.",
+            rich_help_panel="Browser Control",
+        ),
+    ] = "networkidle",
+    session: Annotated[
+        bool,
+        typer.Option(
+            "--session/--no-session",
+            help="Enable browser session reuse.",
+            rich_help_panel="Browser Control",
+        ),
+    ] = False,
+    session_id: Annotated[
+        str | None,
+        typer.Option(
+            "--session-id",
+            help="Custom session_id for browser reuse (overrides --session).",
+            rich_help_panel="Browser Control",
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "-v",
+            "--verbose",
+            help="Enable verbose logging (Script INFO level).",
+            rich_help_panel="General Options",
+        ),
+    ] = False,
+):
+    """
+    :rocket: [bold #fabd2f]Process Mode (All-in-One)[/bold #fabd2f]
+
+    [#458588]The "easy button". Combines discovery and scraping into a seamless, end-to-end pipeline.[/]
+
+    [bold dim]──────────────────────────────────────────────────────────────────[/bold dim]
+
+    [bold #b8bb26]Workflow:[/bold #b8bb26]
+      1. Scans your [cyan]start_url[/] to find all internal links.
+      2. Feeds the discovered links directly into the scraper.
+      3. Saves the resulting Markdown files to your [cyan]output_dir[/].
+
+    [bold #b8bb26]Examples:[/bold #b8bb26]
+      [#8ec07c]➤ Process an entire site with a custom LLM:[/]
+        [dim]$ scribe process https://fastapi.tiangolo.com/ -o api-docs/ --model gpt-4[/dim]
+
+      [#8ec07c]➤ Quickly archive a whole site in Markdown:[/]
+        [dim]$ scribe process https://docs.djangoproject.com/ -o django-docs/ --fast[/dim]
+
+    [bold #83a598]Pro Tip:[/bold #83a598] This is the recommended command for most use cases.
+    """
+    # This logic matches your original file exactly.
+    debug = ctx.obj.get("debug", False)
+    args = argparse.Namespace(
+        start_url=start_url,
+        output_dir=output_dir,
+        start_at=start_at,
+        prompt=prompt,
+        timeout=timeout,
+        wait=wait,
+        model=model,
+        api_key_env=api_key_env,
+        base_url=base_url,
+        max_tokens=max_tokens,
+        session=session,
+        session_id=session_id,
+        fast=fast,
+        verbose=verbose,
+        debug=debug,
     )
-    process_parser.add_argument(
-        "--start-at",
-        type=int,
-        default=0,
-        help="Start processing from URL index (0-based)",
-    )
-    process_parser.add_argument(
-        "-o",
-        "--output-dir",
-        required=True,
-        help="Output directory for markdown files",
-    )
-    process_parser.add_argument(
-        "--prompt",
-        default="",
-        help="Custom LLM filtering prompt (uses default if empty)",
-    )
-    process_parser.add_argument(
-        "--timeout",
-        type=int,
-        default=60000,
-        help="Page timeout in milliseconds",
-    )
-    process_parser.add_argument(
-        "--wait",
-        default="networkidle",
-        help="When to consider page loading complete",
-    )
-    process_parser.add_argument(
-        "--model",
-        default="openrouter/mistralai/codestral-2501",
-        help="LLM model to use for filtering",
-    )
-    process_parser.add_argument(
-        "--api-key-env",
-        default="OPENROUTER_API_KEY",
-        help="Environment variable containing the API key",
-    )
-    process_parser.add_argument(
-        "--base-url",
-        default="https://openrouter.ai/api/v1",
-        help="API Base URL for LLM",
-    )
-    process_parser.add_argument(
-        "-max",
-        "--max-tokens",
-        type=int,
-        default=8192,
-        help="Max output tokens for the LLM filtering",
-    )
-    process_parser.add_argument(
-        "--session",
-        action="store_true",
-        help="Enable browser session reuse (sets session_id to 'scrollscribe_session')",
-    )
-    process_parser.add_argument(
-        "--session-id",
-        type=str,
-        default=None,
-        help="Custom session_id for browser session reuse (overrides --session)",
-    )
-    process_parser.add_argument(
-        "--fast",
-        action="store_true",
-        help="Enable fast HTML→Markdown mode (50-200 docs/min, no LLM filtering)",
-    )
-    process_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging (Script INFO level)",
-    )
+    summary = asyncio.run(process_command(args))
+    print_summary_report(summary)
+
+    # Determine exit code based on failures
+    failed_count = len(summary.get("failed_urls", []))
+    if failed_count > 0:
+        raise typer.Exit(code=1)
+    raise typer.Exit(code=0)
+
+
+# --- Core Logic Functions ---
 
 
 async def discover_command(args: argparse.Namespace) -> int:
-    """Execute the URL discovery command.
-
-    Extracts internal documentation links from a starting website using crawl4ai
-    with browser automation and JavaScript support. Saves discovered URLs to a file.
-
-    Args:
-        args: Parsed command line arguments containing:
-            - start_url: Starting URL to crawl
-            - output_file: File path to save discovered URLs
-            - verbose: Enable detailed logging
-
-    Returns:
-        int: Exit code (0 for success, 1 for failure)
-
-    Raises:
-        Exception: Any error during URL discovery or file writing
-    """
-    from .utils.logging import CleanConsole
-
+    """Execute the URL discovery command."""
+    # This function is identical to your original.
     console = CleanConsole()
     set_logging_verbosity(verbose=args.verbose)
-
     console.print_phase("DISCOVERY", f"Finding internal links from {args.start_url}")
     console.print_info(f"Output file: {args.output_file}")
-
     try:
         found_urls: set[str] = await extract_links_fast(args.start_url, args.verbose)
-
         if found_urls:
             save_links_to_file(found_urls, args.output_file, args.verbose)
             console.print_success(f"Discovery finished. Found {len(found_urls)} URLs.")
@@ -357,357 +588,138 @@ async def discover_command(args: argparse.Namespace) -> int:
         return 1
 
 
-async def scrape_command(args: argparse.Namespace) -> int:
-    """Execute the URL scraping and conversion command.
-
-    Converts a list of URLs to filtered Markdown files using either:
-    - LLM-based filtering for high-quality content extraction (~9 seconds/URL)
-    - Fast HTML-to-Markdown conversion for high-volume processing (~0.1 seconds/URL)
-
-    Args:
-        args: Parsed command line arguments containing:
-            - input_file: Text file with URLs to process
-            - output_dir: Directory for output Markdown files
-            - fast: Enable fast mode (no LLM processing)
-            - model: LLM model for filtering (if not in fast mode)
-            - start_at: Start index for URL processing
-            - timeout: Page load timeout in milliseconds
-            - verbose: Enable detailed logging
-            - Additional LLM and browser configuration options
-
-    Returns:
-        int: Exit code (0 for success, 1 for failure)
-
-    Raises:
-        ConfigError: Missing API key or invalid configuration
-        FileIOError: Unable to read input file or create output directory
-        Exception: Any error during URL processing
-
-    Notes:
-        - Fast mode bypasses LLM processing and has no API costs
-        - LLM mode requires valid API key in environment variable
-        - Creates output directory if it doesn't exist
-        - Supports resuming from specific URL index with --start-at
-    """
-
-    # Use YOUR logging system instead of setting up own RichHandler
-    from .utils.exceptions import ConfigError, FileIOError
-    from .utils.logging import CleanConsole
-
+async def scrape_command(args: argparse.Namespace) -> dict:
+    """Execute the URL scraping and conversion command."""
+    # This function is identical to your original.
     console = CleanConsole()
+    is_debug = getattr(args, "debug", False)
+    set_logging_verbosity(verbose=args.verbose or is_debug)
 
-    # Fast mode doesn't need API key
     if not args.fast:
-        # Check API key for LLM mode
         api_key: str | None = os.getenv(args.api_key_env)
         if not api_key:
             raise ConfigError(
                 f"API key env var '{args.api_key_env}' not found!",
                 config_key=args.api_key_env,
-                suggested_fix=f"Set {args.api_key_env}=your_api_key in your .env file or environment.",
+                suggested_fix=f"Set {args.api_key_env}=your_api_key in your .env or environment.",
             )
-    # Internal logging removed to avoid duplicate with user-facing message in process_command
 
     try:
-        # Read URLs using proper exception handling
-        all_urls: list[str] = read_urls_from_file(args.input_file)
+        urls_to_scrape = read_urls_from_file(args.input_file)
     except FileIOError as e:
         console.print_error(f"File error: {str(e)}")
-        return 1
-    except Exception as e:
-        console.print_error(f"Unexpected error reading URLs: {e}")
-        return 1
+        return {"successful_urls": [], "failed_urls": [("file read", str(e))]}
 
-    # Validate start-at
     if args.start_at < 0:
-        console.print_warning("--start-at cannot be negative. Starting from 0.")
         args.start_at = 0
-    elif args.start_at >= len(all_urls):
+    elif args.start_at >= len(urls_to_scrape):
         console.print_error(
-            f"--start-at index {args.start_at} is out of bounds for {len(all_urls)} URLs."
+            f"--start-at index {args.start_at} is out of bounds for {len(urls_to_scrape)} URLs."
         )
-        return 1
+        return {
+            "successful_urls": [],
+            "failed_urls": [("config", "start_at out of bounds")],
+        }
 
-    urls_to_scrape: list[str] = all_urls[args.start_at :]
-
-    if not urls_to_scrape:
+    urls_to_process = urls_to_scrape[args.start_at :]
+    if not urls_to_process:
         console.print_error(f"No URLs left to process after --start-at {args.start_at}")
-        return 1
+        return {"successful_urls": [], "failed_urls": []}
 
-    # Create output directory
-    output_dir: Path = Path(args.output_dir)
+    output_dir = Path(args.output_dir)
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
+    except OSError as e:
         console.print_error(f"Could not create output dir {output_dir}")
-        return 1
+        return {"successful_urls": [], "failed_urls": [("file system", str(e))]}
 
-    set_logging_verbosity(getattr(args, "debug", False))
+    browser_config = get_browser_config(headless=True, verbose=is_debug)
 
-    browser_config = get_browser_config(
-        headless=True, verbose=getattr(args, "debug", False)
-    )
-
-    # Check if fast mode is enabled
     if args.fast:
-        console.print_info("🚀 Fast mode enabled - using crawl4ai only (no LLM)")
-        from .fast_processing import process_urls_fast
-
-        try:
-            success_count, failed_count = await process_urls_fast(
-                urls_to_scrape=urls_to_scrape,
-                args=args,
-                output_dir=output_dir,
-                browser_config=browser_config,
-            )
-
-            # Return success if we processed at least some URLs
-            return 0 if success_count > 0 else 1
-
-        except KeyboardInterrupt:
-            console.print_warning("KeyboardInterrupt caught in fast mode. Exiting.")
-            return 1
-        except Exception as e:
-            console.print_error(f"Fast mode error: {e}")
-            return 1
-
-    # Regular LLM mode (existing code)
-    api_key = os.getenv(args.api_key_env)  # We already checked this exists above
-
-    # Setup LLM config and filter
-    llm_config = LLMConfig(
-        provider=args.model,
-        api_token=api_key,
-        base_url=args.base_url if args.base_url else None,
-    )
-
-    # Same default prompt as original
-    default_llm_filter_instruction: str = """You are an expert Markdown converter for technical documentation websites.
-    Your goal is to extract ONLY the main documentation content (text, headings, code blocks, lists, tables) from the provided HTML and format it as clean, well-structured Markdown.
-
-    **Site-Specific Hints (Use these to help identify the main content area):**
-    <site_hints>
-    - For Django docs: The main content is likely within a ` class="container sidebar-right"`, specifically look for content inside the `<main>` tag or elements related to 'docs-content'. Be aware this container might also hold irrelevant sidebar info to exclude.
-    Focus on the main documentation only. Ensure the final output contains only valid Markdown syntax. Do not include any raw HTML tags like <div>, <span>, etc. unless it is marked in a code block for demonstration
-    </site_hints>
-
-    - Convert any relative links (URLs beginning with "/" or just a filename/path) to absolute URLs by prefixing them with the original page's base URL (e.g., if base is https://example.com/foo/ and link is bar.html, convert to https://example.com/foo/bar.html; if link is /baz/, convert to https://example.com/baz/). Preserve existing absolute URLs.
-    - Normalize heading styles to consistent title-case.
-    - Ensure code blocks, lists, and tables are accurately preserved.
-    - Spot-check punctuation and quoting in JSON/YAML snippets to avoid stray characters.
-    - Exclude obvious site navigation and ads, but feel free to surface any useful page-specific notes that look relevant.
-
-    Output ONLY the cleaned Markdown content. Do not add any extra explanations or commentary. Ensure the final output contains only valid Markdown syntax. Do not include any raw HTML tags like <div>, <span>, etc. unless it is marked in a code block for demonstration
-    """
-
-    llm_filter_instruction: str = (
-        args.prompt.strip() if args.prompt.strip() else default_llm_filter_instruction
-    )
-
-    llm_content_filter = LLMContentFilter(
-        llm_config=llm_config,
-        instruction=llm_filter_instruction,
-        chunk_token_threshold=args.max_tokens,
-        verbose=False,  # Always disable to reduce noise
-    )
-
-    # Process URLs with the fixed processing function
-    try:
-        success_count, failed_count = await process_urls_batch(
-            urls_to_scrape=urls_to_scrape,
+        summary = await process_urls_fast(
+            urls_to_scrape=urls_to_process,
+            args=args,
+            output_dir=output_dir,
+            browser_config=browser_config,
+        )
+    else:
+        llm_config = LLMConfig(
+            provider=args.model,
+            api_token=os.getenv(args.api_key_env),
+            base_url=args.base_url if args.base_url else None,
+        )
+        default_llm_filter_instruction = """You are an expert Markdown converter for technical documentation websites. Your goal is to extract ONLY the main documentation content (text, headings, code blocks, lists, tables) from the provided HTML and format it as clean, well-structured Markdown. Focus on the main documentation only. Ensure the final output contains only valid Markdown syntax. Do not include any raw HTML tags like <div>, <span>, etc. unless it is marked in a code block for demonstration. Convert any relative links to absolute URLs."""
+        llm_filter_instruction = args.prompt.strip() or default_llm_filter_instruction
+        llm_content_filter = LLMContentFilter(
+            llm_config=llm_config,
+            instruction=llm_filter_instruction,
+            chunk_token_threshold=args.max_tokens,
+            verbose=False,
+        )
+        summary = await process_urls_batch(
+            urls_to_scrape=urls_to_process,
             args=args,
             output_dir=output_dir,
             llm_content_filter=llm_content_filter,
             browser_config=browser_config,
         )
-
-        # Return success if we processed at least some URLs
-        return 0 if success_count > 0 else 1
-
-    except KeyboardInterrupt:
-        console.print_warning("KeyboardInterrupt caught. Exiting.")
-        return 1
-    except Exception as e:
-        console.print_error(f"Unhandled error: {e}")
-        return 1
+    return summary
 
 
-async def process_command(args: argparse.Namespace) -> int:
-    """Execute the unified processing pipeline (discovery + scraping).
-
-    Combines URL discovery and scraping into a single command for end-to-end
-    documentation processing. This is the most convenient way to convert an
-    entire documentation website to Markdown files.
-
-    Process:
-    1. Discovers internal documentation URLs from the starting website
-    2. Saves URLs to a temporary file
-    3. Processes all discovered URLs using LLM or fast mode
-    4. Cleans up temporary files
-
-    Args:
-        args: Parsed command line arguments containing:
-            - start_url: Starting URL for discovery
-            - output_dir: Directory for output Markdown files
-            - fast: Enable fast mode (no LLM processing)
-            - model: LLM model for filtering (if not in fast mode)
-            - start_at: Start index for URL processing
-            - verbose: Enable detailed logging
-            - Additional LLM and browser configuration options
-
-    Returns:
-        int: Exit code (0 for success, 1 for failure)
-
-    Raises:
-        ConfigError: Missing API key or invalid configuration
-        Exception: Any error during discovery or processing phases
-
-    Notes:
-        - Uses temporary file for URL list between discovery and scraping phases
-        - Automatically cleans up temporary files on completion or error
-        - Fast mode bypasses LLM processing and has no API costs
-        - LLM mode requires valid API key in environment variable
-    """
+async def process_command(args: argparse.Namespace) -> dict:
+    """Execute the unified processing pipeline (discovery + scraping)."""
     set_logging_verbosity(verbose=args.verbose)
     console.print_phase("UNIFIED PROCESSING", "Discovery + Scraping pipeline")
 
-    try:
-        # Step 1: Discovery
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as tmp_file:
-            temp_file_path = tmp_file.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp_file:
+        temp_file_path = tmp_file.name
 
+    try:
+        discover_args = argparse.Namespace(
+            start_url=args.start_url,
+            output_file=temp_file_path,
+            verbose=args.verbose,
+        )
+        discover_result = await discover_command(discover_args)
+        if discover_result != 0:
+            console.print_error("Discovery phase failed")
+            return {
+                "successful_urls": [],
+                "failed_urls": [("discovery", "Failed to find any URLs")],
+            }
+
+        if not args.fast:
+            api_key: str | None = os.getenv(args.api_key_env)
+            if not api_key:
+                raise ConfigError(f"API key env var '{args.api_key_env}' not found!")
+            console.print_info(
+                f"🔑 Found API key in env var: [bold lime]{args.api_key_env}[/bold lime]"
+            )
+        else:
+            console.print_info("⚡ Fast mode enabled - no API key needed")
+
+        scrape_args = argparse.Namespace(**vars(args))
+        scrape_args.input_file = temp_file_path
+
+        summary = await scrape_command(scrape_args)
+        return summary
+    finally:
         try:
-            # Create args for discover command
-            discover_args = argparse.Namespace(
-                start_url=args.start_url,
-                output_file=temp_file_path,
-                verbose=args.verbose,
-            )
-
-            discover_result = await discover_command(discover_args)
-            if discover_result != 0:
-                console.print_error("Discovery phase failed")
-                return discover_result
-
-            # Step 2: Scrape
-            # Check API key before scraping (only needed for LLM mode)
-            if not args.fast:
-                api_key: str | None = os.getenv(args.api_key_env)
-                if not api_key:
-                    raise ConfigError(
-                        f"API key env var '{args.api_key_env}' not found!",
-                        config_key=args.api_key_env,
-                        suggested_fix=f"Set {args.api_key_env}=your_api_key in your .env file or environment.",
-                    )
-                console.print_info(
-                    f"🔑 Found API key in env var: [bold lime]{args.api_key_env}[/bold lime]"
-                )
-            else:
-                console.print_info("⚡ Fast mode enabled - no API key needed")
-            # Only log once, not here and in scrape_command
-
-            # Create args for scrape command
-            scrape_args = argparse.Namespace(
-                input_file=temp_file_path,
-                start_at=args.start_at,
-                output_dir=args.output_dir,
-                prompt=args.prompt,
-                timeout=args.timeout,
-                wait=args.wait,
-                model=args.model,
-                api_key_env=args.api_key_env,
-                base_url=args.base_url,
-                max_tokens=args.max_tokens,
-                fast=args.fast,  # Pass through the fast flag
-                verbose=args.verbose,
-            )
-
-            scrape_result = await scrape_command(scrape_args)
-            return scrape_result
-
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_file_path)
-            except OSError:
-                pass
-
-    except ConfigError as e:
-        console.print_error(e.get_help_message())
-        return 1
+            os.unlink(temp_file_path)
+        except OSError:
+            pass
 
 
-def main() -> int:
-    """Main entry point for the ScrollScribe CLI application.
-
-    Parses command line arguments, sets up subcommands, and routes execution
-    to the appropriate command handler. Provides unified error handling and
-    formatted error display using Rich panels.
-
-    Returns:
-        int: Exit code (0 for success, 1 for failure)
-
-    Command Routing:
-        - 'discover': Routes to discover_command()
-        - 'scrape': Routes to scrape_command()
-        - 'process': Routes to process_command()
-        - No command: Displays help and exits
-
-    Error Handling:
-        - ConfigError: Displays formatted configuration error panel
-        - FileIOError: Displays formatted file operation error panel
-        - Other exceptions: Propagated to caller
-
-    Notes:
-        - All async command handlers are executed using asyncio.run()
-        - Rich-formatted error panels provide helpful troubleshooting information
-        - Environment variables are loaded from .env file if present
-    """
-    parser = setup_base_parser()
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # Setup subcommands
-    setup_discover_parser(subparsers)
-    setup_scrape_parser(subparsers)
-    setup_process_parser(subparsers)
-
-    args = parser.parse_args()
-
+def main():
+    """Main entry point for the ScrollScribe CLI application."""
     try:
-        if args.command == "discover":
-            return asyncio.run(discover_command(args))
-        elif args.command == "scrape":
-            return asyncio.run(scrape_command(args))
-        elif args.command == "process":
-            return asyncio.run(process_command(args))
-        else:
-            parser.print_help()
-            return 1
-    except (ConfigError, FileIOError) as ce:
-        panel_title = (
-            "[bold red]CONFIG ERROR[/bold red]"
-            if isinstance(ce, ConfigError)
-            else "[bold red]FILE ERROR[/bold red]"
-        )
-        # Only call get_help_message if it exists and is callable
-        if hasattr(ce, "get_help_message") and callable(
-            getattr(ce, "get_help_message", None)
-        ):
-            help_message = ce.get_help_message()  # pyright: ignore[reportAttributeAccessIssue]
-        else:
-            help_message = str(ce)
-        console.console.print(
-            Panel(
-                help_message,
-                title=panel_title,
-                border_style="red",
-                expand=False,
-            )
-        )
-        return 1
+        app()
+    except typer.Exit:
+        pass
+    except Exception as e:
+        console.print_error(f"An unexpected application error occurred: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

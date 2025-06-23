@@ -22,7 +22,12 @@ class CleanConsole:
         self.console = Console(force_terminal=True, color_system="truecolor")
 
     def print_url_status(
-        self, url: str, status: str, time_taken: float, details: str = "", progress_console=None
+        self,
+        url: str,
+        status: str,
+        time_taken: float,
+        details: str = "",
+        progress_console=None,
     ):
         """Print clean status for each URL processed.
 
@@ -157,7 +162,7 @@ class CleanConsole:
         )
 
     def print_banner(self, title: str, subtitle: str = ""):
-        """Print a beautiful banner for major operations."""
+        """Print a banner for major operations."""
         self.console.print()
         self.console.rule(f"[bold #c4a7e7]{title}[/]", style="#6e6a86")
         if subtitle:
@@ -239,7 +244,9 @@ class CleanConsole:
             phase_text += f" [#908caa]• {description}[/]"
         self.console.print(phase_text)
 
-    def print_fetch_status(self, url: str, status: str, time_taken: float = 0, progress_console=None):
+    def print_fetch_status(
+        self, url: str, status: str, time_taken: float = 0, progress_console=None
+    ):
         """Print simplified fetch status for verbose mode.
 
         Args:

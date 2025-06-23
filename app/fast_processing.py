@@ -57,7 +57,7 @@ async def process_urls_fast(
     args,
     output_dir: Path,
     browser_config: BrowserConfig,
-) -> tuple[int, int]:
+):
     """Convert a batch of documentation URLs to Markdown using fast, non-LLM processing.
 
     This function uses crawl4ai's PruningContentFilter and DefaultMarkdownGenerator
@@ -70,7 +70,7 @@ async def process_urls_fast(
         browser_config: Browser configuration for crawl4ai.
 
     Returns:
-        tuple[int, int]: Number of successful and failed conversions.
+        dict: Summary with lists of successful and failed URLs.
     """
     start_time = time.time()
 
@@ -145,6 +145,8 @@ async def process_urls_fast(
     logger.info(f"Starting fast crawl for {len(urls_to_scrape)} URLs...")
     success_count: int = 0
     failed_count: int = 0
+    successful_urls = []
+    failed_urls = []
     shutdown_requested: bool = False
 
     try:
@@ -190,6 +192,7 @@ async def process_urls_fast(
 
                             if not raw_markdown or len(raw_markdown.strip()) < 50:
                                 failed_count += 1
+                                failed_urls.append((url, "empty content"))
                                 clean_console.print_url_status(
                                     url, "warning", 0, "empty content"
                                 )
@@ -218,9 +221,11 @@ async def process_urls_fast(
                                     f"{chars:,} chars → {filename}",
                                 )
                                 success_count += 1
+                                successful_urls.append(url)
 
                             except OSError as e:
                                 failed_count += 1
+                                failed_urls.append((url, f"save failed: {e}"))
                                 logger.error(
                                     f"Failed to save markdown for {url} to {filepath}: {e}"
                                 )
@@ -230,6 +235,7 @@ async def process_urls_fast(
                         else:
                             failed_count += 1
                             error_msg = result.error_message or "No markdown generated"
+                            failed_urls.append((url, error_msg))
                             logger.error(f"Fast processing failed: {error_msg}")
                             clean_console.print_url_status(url, "error", 0, error_msg)
 
@@ -244,6 +250,7 @@ async def process_urls_fast(
 
                     except Exception as exc:
                         failed_count += 1
+                        failed_urls.append((url, f"unexpected error: {exc}"))
                         logger.error(
                             f"Unexpected error in fast processing {url}: {exc}"
                         )
@@ -280,4 +287,8 @@ async def process_urls_fast(
             f"Fast ScrollScribe finished. Saved: {success_count}. Failed/Skipped: {failed_count}."
         )
 
-    return success_count, failed_count
+    summary = {
+        "successful_urls": successful_urls,
+        "failed_urls": failed_urls,
+    }
+    return summary

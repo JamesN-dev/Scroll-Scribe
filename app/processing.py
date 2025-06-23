@@ -304,7 +304,7 @@ async def process_urls_batch(
     output_dir: Path,
     llm_content_filter: LLMContentFilter,
     browser_config: BrowserConfig,
-) -> tuple[int, int]:
+) -> dict:  # <--- CHANGE THIS LINE
     """Processes a batch of documentation URLs, converting each to filtered Markdown using an LLM content filter.
 
     This function:
@@ -320,10 +320,9 @@ async def process_urls_batch(
         browser_config (BrowserConfig): Configuration for the web browser/crawler.
 
     Returns:
-        tuple[int, int]: A tuple containing the number of successful and failed URL processings.
+        dict: Summary with lists of successful and failed URLs.
     """
     start_time = time.time()
-
     # [NOT FUNCTIONAL CURRENTLY - CRAWL4AI BUG]
     # Session logic: only set session_id if --session or --session-id is provided
     session_id: str = ""
@@ -372,6 +371,8 @@ async def process_urls_batch(
     logger.info(f"Starting crawl for {len(urls_to_scrape)} URLs...")
     success_count: int = 0
     failed_count: int = 0
+    successful_urls = []
+    failed_urls = []
     shutdown_requested: bool = False
 
     try:
@@ -422,6 +423,7 @@ async def process_urls_batch(
 
                             if not html_to_filter:
                                 failed_count += 1
+                                failed_urls.append((url, "empty content"))
                                 clean_console.print_url_status(
                                     url,
                                     "warning",
@@ -463,10 +465,12 @@ async def process_urls_batch(
                                             f"{chars:,} chars → {filename}",
                                             progress_console=progress.console,
                                         )
+                                    successful_urls.append(url)
                                     success_count += 1
 
-                                except OSError:
+                                except OSError as e:
                                     failed_count += 1
+                                    failed_urls.append((url, str(e)))
                                     logger.error(
                                         f"Failed to save markdown for {url} to {filepath}"
                                     )
@@ -479,6 +483,7 @@ async def process_urls_batch(
                                     )
                             else:
                                 failed_count += 1
+                                failed_urls.append((url, "no LLM content"))
                                 clean_console.print_url_status(
                                     url,
                                     "warning",
@@ -488,6 +493,7 @@ async def process_urls_batch(
                                 )
                         else:
                             failed_count += 1
+                            failed_urls.append((url, "empty content"))
                             error_msg = result.error_message or "Unknown error"
                             logger.error(f"HTML fetch failed: {error_msg}")
                             clean_console.print_url_status(
@@ -510,6 +516,7 @@ async def process_urls_batch(
 
                     except Exception as exc:
                         failed_count += 1
+                        failed_urls.append((url, str(exc)))
                         logger.error(f"Unexpected error processing {url}: {exc}")
 
                         # Use proper exception handling
@@ -550,4 +557,8 @@ async def process_urls_batch(
             f"ScrollScribe finished processing. Saved: {success_count}. Failed/Skipped: {failed_count}."
         )
 
-    return success_count, failed_count
+    summary = {
+        "successful_urls": successful_urls,
+        "failed_urls": failed_urls,
+    }
+    return summary

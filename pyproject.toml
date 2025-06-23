@@ -11,13 +11,14 @@ dependencies = [
     "requests>=2.26.0",
     "python-dotenv>=1.0.0",
     "rich>=13.9.0",
-    "rich-argparse>=1.7.0",
     "tenacity>=8.0.0",
     "questionary>=2.1.0",
+    "typer[all]>=0.16.0",
 ]
 
 [project.scripts]
 scrollscribe = "app.cli:main"
+scribe = "app.cli:main"
 
 [tool.uv]
 package = true

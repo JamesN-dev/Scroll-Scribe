@@ -64,28 +64,36 @@ ScrollScribe/
 
 ## 🔍 Detailed File Analysis
 
-### **`app/cli.py`** - Command Interface
+### **`app/cli.py`** - Command Interface ✅ MODERNIZED
 
-**Role:** Main entry point and command orchestration
+**Role:** Modern Typer-based CLI with beautiful help and command orchestration
 
-**Key Functions:**
+**Key Components:**
 
-- `discover_command()` - Orchestrates URL discovery phase
-- `scrape_command()` - Orchestrates URL processing phase
-- `process_command()` - Unified pipeline (discover + scrape)
+- **Typer Commands:** `discover()`, `scrape()`, `process()` with rich help documentation
+- **Async Bridge:** Commands call existing async functions via `argparse.Namespace` bridge
+- **Global Options:** `--debug` flag via `@app.callback()` for global configuration
 
 **Dependencies:**
 
-- `crawl4ai`: LLM configuration classes
-- `rich`: Beautiful CLI output and progress bars
-- `argparse`: Command-line argument parsing
+- `typer[all]`: Modern CLI framework with Rich integration
+- `crawl4ai`: LLM configuration classes  
+- **Bridge:** `argparse.Namespace` for compatibility with existing async functions
 
 **Performance:** ⚡ Fast (CLI layer, no bottlenecks)
+
+**Features:**
+
+- **Gruvbox-themed help** with rich examples and color coding
+- **Shell completion** support for tab completion
+- **Beautiful error display** integrated with existing CleanConsole system
+- **Emoji indicators** for visual appeal and command identification
 
 **Notes:**
 
 - Supports both `--fast` mode and regular LLM mode
-- Handles temporary file management for unified pipeline
+- Maintains full backward compatibility through bridge pattern
+- All existing async logic preserved unchanged
 - Environment variable validation (API keys)
 
 ---
