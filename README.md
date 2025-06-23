@@ -1,283 +1,351 @@
-# 🚀 ScrollScribe V2 - AI-Powered Documentation Scraper
+# ScrollScribe :scroll:
 
-**Transform any documentation website into clean, filtered Markdown files using advanced LLM processing.**
+**Convert any documentation website into clean, searchable Markdown files.**
 
-ScrollScribe V2 is a high-performance, modular CLI tool that discovers URLs from documentation websites and converts them into clean, well-structured Markdown files using AI-powered content filtering. Unlike simple web scrapers, ScrollScribe uses Large Language Models to intelligently extract and format only the relevant documentation content.
+ScrollScribe automatically discovers all pages on a documentation site and converts them to clean Markdown files. Perfect for creating offline documentation, feeding docs into AI tools, or building your own documentation search systems.
 
-## ✨ What's New in V2
+## What ScrollScribe Does
 
-### 🚀 Performance Improvements
+1. **Discovers** all documentation pages from a starting URL
+2. **Downloads** the content from each page  
+3. **Converts** HTML to clean Markdown using AI or fast processing
+4. **Saves** each page as a separate `.md` file
 
-- **2x Speed Boost**: Fixed duplicate fetching bug - no more redundant URL requests
-- **Session Reuse**: _(Temporarily disabled due to a bug in crawl4ai; will be restored when upstream is fixed)_
-- **Smart Retries**: Automatic retry handling with exponential backoff for rate limits
-- **Memory Management**: Adaptive dispatcher prevents out-of-memory issues
+**Example:** Point it at `https://docs.fastapi.com/` and get 200+ clean Markdown files covering the entire FastAPI documentation.
 
-### 🎯 New CLI Interface
-
-- **Modular Commands**: Separate `discover`, `scrape`, and unified `process` commands
-- **Better Error Handling**: Improved error messages and graceful failure handling
-- **Flexible Usage**: Run discovery and scraping separately or as a unified pipeline
-
-### 🏗️ Code Quality
-
-- **Modular Architecture**: Clean separation of concerns across multiple files
-- **Type Safety**: Full type annotations throughout the codebase
-- **Robust Exception Handling**: Custom exception hierarchy with retry logic
-
----
-
-> **Note:**
-> Browser session reuse and Playwright-based browser management are temporarily disabled due to a bug in the crawl4ai dependency. These features will be restored as soon as the upstream fix is merged.
-
-## 🎯 Key Features
-
-- **🤖 AI-Powered Filtering**: Uses advanced LLMs (Mistral Codestral recommended) to extract only relevant documentation content
-- **🔗 Smart URL Discovery**: Automatically finds and follows internal documentation links
-- **📄 Clean Markdown Output**: Converts HTML to well-structured Markdown with proper formatting
-- **⚡ High Performance**: Batch processing with intelligent rate limiting
-- **🔄 Retry Logic**: Automatic handling of rate limits and network errors
-- **📊 Rich Progress Display**: Real-time progress bars with ETA and processing rates
-- **🎨 Beautiful Console Output**: Rich terminal interface with colored status messages
-
-## 🚀 Quick Start
-
-### Installation
+## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd ScrollScribe
-
-# Install dependencies (using uv - recommended)
-uv sync
-
-# Or with pip
-pip install -r requirements.txt
+git clone https://github.com/your-username/scrollscribe
+cd scrollscribe
+uv sync  # or pip install -r requirements.txt
 ```
 
-### Set up your API key
-
-Create a `.env` file in the project root:
-
-```bash
-# .env
-OPENROUTER_API_KEY="your-openrouter-api-key-here"
-```
+## Quick Start
 
 ### Basic Usage
 
 ```bash
-# Discover URLs from a documentation site
-python -m app discover https://docs.example.com/ -o urls.txt
+# Convert entire documentation site to Markdown
+scribe process https://docs.fastapi.com/ -o fastapi-docs/
 
-# Convert URLs to markdown using AI filtering
-python -m app scrape urls.txt -o output/
-
-# Unified pipeline (discover + scrape in one command)
-python -m app process https://docs.example.com/ -o output/
+# That's it! All pages are now in the fastapi-docs/ folder
 ```
 
-## 📋 Command Reference
+### Set up API Key (Recommended)
 
-### `discover` - Extract URLs from documentation sites
+For highest quality output, add your API key:
 
 ```bash
-python -m app discover <start_url> -o <output_file> [options]
+# Create .env file with your API key
+echo "OPENROUTER_API_KEY=your-key-here" > .env
 
-# Example
-python -m app discover https://docs.crawl4ai.com/ -o crawl4ai_urls.txt -v
+# Now uses best model by default (Codestral 2501)
+scribe process https://docs.fastapi.com/ -o fastapi-docs/
 ```
 
-**Options:**
+## Processing Modes
 
-- `-o, --output-file`: File to save discovered URLs (required)
-- `-v, --verbose`: Enable verbose logging
+ScrollScribe offers two processing modes depending on your needs:
 
-### `scrape` - Convert URLs to filtered markdown
+| Feature | **Fast Mode** | **AI Mode** |
+|---------|---------------|-------------|
+| **Speed** | 50-200 pages/minute | 10-15 pages/minute |
+| **Cost** | Free | ~$0.005 per page (Codestral) |
+| **Quality** | Good - removes navigation/ads | Excellent - AI-filtered content |
+| **API Key** | Not required | Required |
+| **Best For** | Large sites, quick extraction | High-quality documentation |
+| **Default Model** | N/A | Codestral 2501 |
+
+### Fast Mode (No API Key Needed)
 
 ```bash
-python -m app scrape <input_file> -o <output_dir> [options]
-
-# Example
-python -m app scrape urls.txt -o output/ --model openrouter/mistralai/codestral-2501 -v
+# Fast processing - no API key required
+scribe process https://docs.fastapi.com/ -o fastapi-docs/ --fast
 ```
 
-**Options:**
+**Good for:**
+- Large documentation sites (1000+ pages)
+- Quick content extraction
+- When you don't want to pay for API calls
 
-- `--start-at N`: Start processing from URL index N (0-based)
-- `-o, --output-dir`: Output directory for markdown files (required)
-- `--fast`: Enable fast HTML→Markdown mode (50-200 docs/min, no LLM filtering)
-- `--model`: LLM model for filtering (default: gemini-2.0-flash-exp:free)
-- `--prompt`: Custom LLM filtering prompt
-- `--timeout`: Page timeout in milliseconds (default: 60000)
-- `--wait`: Page load condition (default: networkidle)
-- `--api-key-env`: Environment variable for API key (default: OPENROUTER_API_KEY)
-- `--base-url`: API base URL (default: https://openrouter.ai/api/v1)
-- `--max-tokens`: Max LLM output tokens (default: 8192)
-- `-v, --verbose`: Enable verbose logging
-
-### `process` - Unified pipeline (discover + scrape)
+### AI Mode (Default with API Key)
 
 ```bash
-python -m app process <start_url> -o <output_dir> [options]
-
-# Example
-python -m app process https://docs.example.com/ -o output/ --model openrouter/mistralai/codestral-2501
+# Uses Codestral 2501 by default - best quality
+scribe process https://docs.fastapi.com/ -o fastapi-docs/
 ```
 
-Accepts all the same options as `scrape` command.
+**Good for:**
+- High-quality documentation extraction (default mode)
+- When clean formatting is important
+- Feeding into other AI tools
 
-## 🎨 Recommended Models
+## Commands
 
-### 🆓 Free Models
+ScrollScribe has three main commands:
 
-- `openrouter/google/gemini-2.0-flash-exp:free` (default)
-- `openrouter/meta-llama/llama-3.2-1b-instruct:free`
+### `process` - Complete Pipeline (Most Common)
 
-### 💰 Premium Models (Better Quality)
-
-- `openrouter/mistralai/codestral-2501` ⭐ **Recommended for best markdown output**
-- `openrouter/anthropic/claude-3-haiku`
-
-**Cost**: Premium models typically cost $0.005-$0.01 per page using Codestral 2501.
-
-## 📊 Performance Comparison
-
-| Version | Pages/Min | Duplicate Fetching | Session Reuse | Error Handling |
-| ------- | --------- | ------------------ | ------------- | -------------- |
-| V1      | ~4.9      | ❌ Yes             | ❌ No         | ⚠️ Manual      |
-| V2      | ~9.8+     | ✅ Fixed           | ✅ Yes        | ✅ Automatic   |
-
-## ⚡ Fast Mode (NEW!)
-
-ScrollScribe now offers a blazing-fast HTML→Markdown conversion mode that bypasses LLM processing entirely:
+Convert an entire documentation site in one command:
 
 ```bash
-# Fast mode examples
-python -m app scrape urls.txt -o output/ --fast
-python -m app process https://docs.example.com/ -o output/ --fast
+# Discover all pages and convert them to Markdown
+scribe process https://docs.fastapi.com/ -o fastapi-docs/
 ```
 
-### Fast Mode Benefits
+### `discover` - Find All Documentation Pages
 
-- **🚀 Speed**: 50-200 docs/minute (5-20x faster than LLM mode)
-- **💰 Cost**: No API costs - completely free to run
-- **🔋 Efficiency**: Uses crawl4ai's built-in markdown generation with smart content filtering
-- **🎯 Quality**: PruningContentFilter removes navigation, footers, and low-value content
-
-### When to Use Fast Mode
-
-- **Large documentation sites** (hundreds or thousands of pages)
-- **Budget-conscious projects** (no LLM API costs)
-- **Quick content extraction** where perfect formatting isn't critical
-- **Testing and development** workflows
-
-### LLM vs Fast Mode Comparison
-
-| Feature | LLM Mode | Fast Mode |
-|---------|----------|-----------|
-| Speed | ~10 docs/min | 50-200 docs/min |
-| Cost | $0.005-$0.01/page | Free |
-| Quality | Excellent | Good |
-| API Required | Yes | No |
-| Use Case | High-quality docs | Large-scale extraction |
-
-## 🛠️ Advanced Usage
-
-### Custom LLM Prompts
+Extract just the URLs from a site (useful for manual curation):
 
 ```bash
-python -m app scrape urls.txt -o output/ --prompt "Extract only API documentation and code examples. Format as markdown with clear headings."
+# Get list of all documentation URLs
+scribe discover https://docs.fastapi.com/ -o urls.txt
 ```
 
-### Processing Large Sites
+**Why use discover separately?**
+- **Manual curation**: Edit `urls.txt` to remove pages you don't want
+- **Planning**: See how many pages before processing
+- **Selective processing**: Only download the pages you actually need
+
+### `scrape` - Convert to Markdown
+
+Process URLs or a single page:
 
 ```bash
-# Start from a specific URL index (useful for resuming)
-python -m app scrape urls.txt -o output/ --start-at 50
+# Process a curated list of URLs
+scribe scrape urls.txt -o fastapi-docs/
 
-# Use longer timeout for slow sites
-python -m app scrape urls.txt -o output/ --timeout 120000
+# Process a single page
+scribe scrape https://docs.fastapi.com/tutorial/first-steps/ -o output/
 ```
 
-### Different API Providers
+**Smart input detection**: `scrape` automatically detects if you're giving it:
+- A `.txt` file with URLs (one per line)
+- A single webpage URL (`http://` or `https://`)
+
+## API Keys & Models
+
+**Default Model**: `openrouter/mistralai/codestral-2501` ⭐ (Best quality)
+
+### Alternative Models
+- `openrouter/google/gemini-2.0-flash-exp:free` (Free tier)
+- `openrouter/anthropic/claude-3-haiku` (Fast premium)
+
+### Setting API Key
+```bash
+# Setup: Add API keys to .env file
+echo "OPENROUTER_API_KEY=your-openrouter-key" >> .env
+echo "ANTHROPIC_API_KEY=your-anthropic-key" >> .env
+echo "MISTRAL_API_KEY=your-mistral-key" >> .env
+
+# Use default API key (OPENROUTER_API_KEY)
+scribe process https://docs.example.com/ -o output/
+
+# Use a different API key variable
+scribe process https://docs.example.com/ -o output/ --api-key ANTHROPIC_API_KEY
+```
+
+### Changing Models
+```bash
+# Use a different model with its corresponding API key
+scribe process https://docs.example.com/ -o output/ \
+  --model openrouter/anthropic/claude-3-haiku \
+  --api-key ANTHROPIC_API_KEY
+
+# Use free model (still needs OpenRouter key)
+scribe process https://docs.example.com/ -o output/ \
+  --model openrouter/google/gemini-2.0-flash-exp:free
+```
+
+Get a free API key at [OpenRouter](https://openrouter.ai/).
+
+## Workflow Examples
+
+### Complete Workflow (Most Common)
+```bash
+# One command to rule them all
+scribe process https://docs.fastapi.com/ -o fastapi-docs/
+```
+
+### Curated Workflow (Manual Selection)
+```bash
+# Step 1: Discover all pages
+scribe discover https://docs.fastapi.com/ -o urls.txt
+
+# Step 2: Edit urls.txt - remove pages you don't want
+# Step 3: Process only the pages you kept
+scribe scrape urls.txt -o fastapi-docs/
+```
+
+### Single Page
+```bash
+# Process just one specific page
+scribe scrape https://docs.fastapi.com/tutorial/first-steps/ -o output/
+```
+
+### For Developers
+- **Offline Documentation**: Work with docs without internet
+- **AI Tools**: Feed clean docs into Claude, ChatGPT, or local AI
+- **Documentation Search**: Build custom search for your team
+- **Backup**: Archive documentation that might change or disappear
+
+### For Teams
+- **Internal Knowledge Base**: Convert internal wikis to searchable Markdown
+- **Compliance**: Archive API documentation for regulatory requirements
+- **Training Data**: Clean documentation for training custom models
+
+### For Researchers
+- **Literature Review**: Convert technical documentation for analysis
+- **Comparative Studies**: Analyze documentation across different tools
+- **Academic Research**: Study how projects document their APIs
+
+## Advanced Usage
+
+### Separate Discovery and Processing
 
 ```bash
-# Use different API key environment variable
-python -m app scrape urls.txt -o output/ --api-key-env MISTRAL_API_KEY --base-url https://api.mistral.ai/v1
+# Step 1: Discover all URLs (fast)
+scribe discover https://docs.fastapi.com/ -o urls.txt
+
+# Step 2: Process URLs to Markdown
+scribe scrape urls.txt -o fastapi-docs/
 ```
 
-## 📁 Project Structure
-
-```
-ScrollScribe/
-├── app/
-│   ├── __main__.py          # Package entry point
-│   ├── cli.py               # Command-line interface
-│   ├── discovery.py         # URL discovery logic
-│   ├── processing.py        # Core processing with performance fixes
-│   ├── config.py            # Configuration factories
-│   └── utils/               # Utilities (retry, exceptions)
-├── archive/                 # Original V1 files
-├── test_performance.py      # Performance testing script
-└── README.md               # This file
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**API Key Not Found**
+### Resume Processing
 
 ```bash
-[ERROR] API key env var 'OPENROUTER_API_KEY' not found!
+# Resume from URL #50 if processing was interrupted
+scribe scrape urls.txt -o output/ --start-at 50
 ```
 
-Solution: Create `.env` file with your API key or set the environment variable.
-
-**Rate Limiting**
+### Custom Settings
 
 ```bash
-Rate limit error: Provider returned error 429
+# Use different model with custom timeout
+scribe process https://docs.example.com/ -o output/ \
+  --model openrouter/anthropic/claude-3-haiku \
+  --timeout 120000 \
+  --verbose
+
+# Use different API key variable
+scribe process https://docs.example.com/ -o output/ \
+  --api-key ANTHROPIC_API_KEY
+
+# Combine custom model and API key variable
+scribe process https://docs.example.com/ -o output/ \
+  --model openrouter/mistralai/codestral-2501 \
+  --api-key OPENROUTER_API_KEY \
+  --verbose
 ```
 
-Solution: ScrollScribe automatically retries with exponential backoff. For persistent issues, try a different model or add your own API key to accumulate rate limits.
+## Output Structure
 
-**Network Errors**
+ScrollScribe creates one Markdown file per documentation page:
+
+```
+output/
+├── index.md                    # Homepage
+├── getting-started.md          # Getting started guide  
+├── api-reference-users.md      # API reference pages
+├── tutorial-first-steps.md     # Tutorial sections
+└── ...                         # One file per page
+```
+
+Each file contains:
+- Clean Markdown formatting
+- Preserved code blocks and syntax highlighting
+- Working internal links (converted to relative paths)
+- Original page title as the filename
+
+## Common Examples
+
+### Popular Documentation Sites
 
 ```bash
-Failed on navigating: net::ERR_ABORTED
+# Python libraries
+scribe process https://docs.pydantic.dev/ -o pydantic-docs/
+scribe process https://docs.sqlalchemy.org/ -o sqlalchemy-docs/
+
+# Web frameworks  
+scribe process https://docs.djangoproject.com/ -o django-docs/
+scribe process https://nextjs.org/docs -o nextjs-docs/
+
+# Cloud services
+scribe process https://docs.aws.amazon.com/s3/ -o aws-s3-docs/
+scribe process https://cloud.google.com/docs/apis -o gcp-docs/
+
+# Dev tools
+scribe process https://docs.docker.com/ -o docker-docs/
+scribe process https://kubernetes.io/docs/ -o k8s-docs/
 ```
 
-Solution: Some sites block automated requests. Try increasing timeout or using different wait conditions.
-
-### Debug Mode
-
-Enable verbose logging for detailed information:
+### Large Sites (Use Fast Mode)
 
 ```bash
-python -m app scrape urls.txt -o output/ -v
+# Large documentation sites - use fast mode for speed
+scribe process https://docs.microsoft.com/en-us/azure/ -o azure-docs/ --fast
+scribe process https://developer.mozilla.org/en-US/docs/ -o mdn-docs/ --fast
 ```
 
-## 🤝 Contributing
+## Troubleshooting
 
-1. Fork the repository
-2. Create a feature branch
+### "API key not found"
+Create a `.env` file with your OpenRouter API key:
+```bash
+echo "OPENROUTER_API_KEY=your-key-here" > .env
+```
+
+### "Rate limit error" 
+ScrollScribe automatically retries with backoff. For persistent issues:
+- Try the free models first
+- Use `--fast` mode to avoid API calls entirely
+
+### "Some pages failed"
+Some sites block automated access. ScrollScribe will:
+- Show which URLs failed
+- Continue processing other pages
+- Let you retry failed URLs later
+
+### Site-specific issues
+```bash
+# Increase timeout for slow sites
+scribe process https://slow-site.com/ -o output/ --timeout 120000
+
+# Use verbose mode to see what's happening
+scribe process https://site.com/ -o output/ --verbose
+```
+
+## Performance Tips
+
+- **Use `--fast` for large sites** (1000+ pages) to avoid API costs
+- **Use AI mode for quality** when you need clean, well-formatted output  
+- **Process in chunks** using `--start-at` for very large sites
+- **Set longer timeouts** for slow or heavy documentation sites
+
+## What's Different About ScrollScribe
+
+Unlike simple web scrapers, ScrollScribe:
+
+- **Understands documentation structure** - follows internal links intelligently
+- **Cleans content** - removes navigation, ads, and irrelevant elements  
+- **Preserves formatting** - maintains code blocks, headers, and structure
+- **Handles modern sites** - works with JavaScript-heavy documentation
+- **Scales efficiently** - processes hundreds of pages reliably
+
+## Contributing
+
+Found a bug or want to add a feature? 
+
+1. Open an issue describing the problem
+2. Fork the repository  
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Submit a pull request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [crawl4ai](https://github.com/unclecode/crawl4ai) for web crawling
-- Uses [Rich](https://github.com/Textualize/rich) for beautiful terminal output
-- LLM integration via [LiteLLM](https://github.com/BerriAI/litellm)
+MIT License - use ScrollScribe for any purpose, commercial or personal.
 
 ---
 
-**ScrollScribe V2** - Transforming documentation, one page at a time. 🚀
+**ScrollScribe** - Turn any documentation site into clean, searchable Markdown files.
