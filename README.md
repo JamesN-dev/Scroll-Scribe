@@ -1,8 +1,6 @@
-# ScrollScribeAI :scroll: Docs Web Scraper
-## Turn Any Documentation Site into Searchable Markdown Files
+# ScrollScribeAI :scroll: HTML to Markdown
 
-
-**Convert any documentation website into clean, searchable Markdown files.**
+## Convert any documentation website into clean, searchable Markdown files.
 
 ScrollScribe automatically discovers all pages on a documentation site and converts them to clean Markdown files. Perfect for creating offline documentation, feeding docs into AI tools, or building your own documentation search systems.
 
