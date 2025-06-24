@@ -43,8 +43,7 @@ from rich.table import Table
 # Assume these are your project's modules.
 # If the structure is different, you may need to adjust the import paths.
 from .config import get_browser_config
-from .discovery import save_links_to_file
-from .fast_discovery import extract_links_fast
+from .fast_discovery import extract_links_fast, save_links_to_file
 from .fast_processing import process_urls_fast
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError

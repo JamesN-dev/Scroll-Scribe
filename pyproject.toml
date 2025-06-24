@@ -1,7 +1,7 @@
 [project]
 name = "scrollscribe"
 version = "0.3.0"
-description = "AI-powered documentation scraper that transforms websites into clean, filtered Markdown"
+description = "AI-powered documentation scraper that transforms documentation websites into clean, filtered Markdown"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -42,6 +42,9 @@ version_scheme = "pep440"
 version_provider = "uv"
 update_changelog_on_bump = true
 major_version_zero = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [tool.basedpyright]
 typeCheckingMode = "basic"

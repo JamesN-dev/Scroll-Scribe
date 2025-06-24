@@ -14,7 +14,10 @@ Example:
     links = extract_links_fast("https://docs.example.com/", verbose=True)
 """
 
+from pathlib import Path
+
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
+from rich.console import Console
 
 from .utils.exceptions import InvalidUrlError, NetworkError
 from .utils.logging import CleanConsole
@@ -152,3 +155,38 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
             ) from e
 
     return internal_links
+
+
+def save_links_to_file(
+    links: set[str], output_file: str, verbose: bool = False
+) -> None:
+    """Save discovered links to a text file.
+
+    Args:
+        links: Set of URLs to save
+        output_file: Path to output file
+        verbose: Enable verbose logging
+    """
+    console = Console()
+
+    if not links:
+        if verbose:
+            console.print("[yellow][WARN] No valid URLs to save.[/yellow]")
+        return
+
+    if verbose:
+        console.print(
+            f"\n[cyan][INFO] Found {len(links)} unique URLs. Saving...[/cyan]"
+        )
+
+    out_path: Path = Path(output_file)
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("\n".join(sorted(links)), encoding="utf-8")
+        if verbose:
+            console.print(f"[green][SUCCESS] Saved to {out_path}[/green]")
+    except Exception as e:
+        console.print(
+            f"[bold red][ERROR] Could not write file {out_path}: {e}[/bold red]"
+        )
+        raise
