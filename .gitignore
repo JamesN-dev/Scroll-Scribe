@@ -7,6 +7,9 @@ wheels/
 *.egg-info
 .ruff_cache
 .ropeproject
+.python-version
+.pytest_cache
+
 
 # Virtual environments
 .venv
@@ -35,3 +38,4 @@ plans/
 archive/
 tests/dev-test
 docs/scraped-docs
+docs/dev-docs
