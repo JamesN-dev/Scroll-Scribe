@@ -106,8 +106,8 @@ ScrollScribe/
 
 **Key Functions:**
 
-- `extract_links_fast(url, verbose)` - Main fast discovery function
-- Uses `save_links_to_file()` from legacy discovery.py for file persistence
+- `extract_links_fast(url, verbose)` - Main fast discovery function that returns an ordered list[str] of unique URLs
+- Uses `save_links_to_file()` to persist the ordered URL list to a text file
 
 **Method Used:** **MODERN APPROACH**
 

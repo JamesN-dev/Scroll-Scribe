@@ -78,6 +78,7 @@ ScrollScribe/
 
 - [x] **COMPLETED**: Replace legacy discovery with fast crawl4ai-based discovery
     - `fast_discovery.py` now provides `extract_links_fast()` using AsyncWebCrawler
+    - Returns an ordered list of unique URLs, preserving discovery order
     - CLI updated to use fast discovery by default (no more legacy bottleneck)
     - Discovery is now fast (seconds vs ~30 seconds previously)
     - Cache disabled by default to ensure fresh content for documentation

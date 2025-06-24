@@ -581,7 +581,7 @@ async def discover_command(args: argparse.Namespace) -> int:
     console.print_phase("DISCOVERY", f"Finding internal links from {args.start_url}")
     console.print_info(f"Output file: {args.output_file}")
     try:
-        found_urls: set[str] = await extract_links_fast(args.start_url, args.verbose)
+        found_urls: list[str] = await extract_links_fast(args.start_url, args.verbose)
         if found_urls:
             save_links_to_file(found_urls, args.output_file, args.verbose)
             console.print_success(f"Discovery finished. Found {len(found_urls)} URLs.")
