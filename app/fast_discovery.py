@@ -11,7 +11,7 @@ Key features:
 
 Example:
     from fast_discovery import extract_links_fast
-    links = extract_links_fast("https://docs.example.com/", verbose=True)
+    links: list[str] = await extract_links_fast("https://docs.example.com/", verbose=True)
 """
 
 from pathlib import Path
@@ -19,17 +19,17 @@ from pathlib import Path
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 from rich.console import Console
 
-from .utils.error_classification import classify_error_type
-from .utils.exceptions import InvalidUrlError, NetworkError
-from .utils.logging import CleanConsole
-from .utils.retry import retry_network
+from app.utils.error_classification import classify_error_type
+from app.utils.exceptions import InvalidUrlError, NetworkError
+from app.utils.logging import CleanConsole
+from app.utils.retry import retry_network
 
 
 @retry_network
-async def extract_links_fast(start_url: str, verbose: bool = False) -> set[str]:
+async def extract_links_fast(start_url: str, verbose: bool = False) -> list[str]:
     """
     Async fast link discovery using Crawl4AI.
-    Returns a set of internal links (hrefs as strings).
+    Returns an ordered list of internal links (hrefs as strings).
     Always fetches fresh content (cache disabled).
 
     Args:
@@ -37,7 +37,7 @@ async def extract_links_fast(start_url: str, verbose: bool = False) -> set[str]:
         verbose: Enable verbose logging output
 
     Returns:
-        Set of unique internal URLs found on the page
+        Ordered list of unique internal URLs found on the page
 
     Raises:
         InvalidUrlError: If the URL cannot be parsed or processed
@@ -62,7 +62,20 @@ async def extract_links_fast(start_url: str, verbose: bool = False) -> set[str]:
             raise NetworkError(f"Discovery operation failed: {e}", url=start_url) from e
 
 
-async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str]:
+async def _extract_links_async(start_url: str, verbose: bool = False) -> list[str]:
+    """Internal async function to extract links using ordered duplicate-free approach.
+
+    Args:
+        start_url: The starting URL to scrape for links
+        verbose: Enable verbose logging output
+
+    Returns:
+        Ordered list of unique internal URLs found on the page
+
+    Raises:
+        InvalidUrlError: If the URL cannot be parsed or processed
+        NetworkError: If the crawl fails due to network issues
+    """
     console = CleanConsole()
 
     if verbose:
@@ -76,7 +89,8 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
         exclude_external_links=True,
     )
 
-    internal_links: set[str] = set()
+    seen: set[str] = set()
+    ordered_links: list[str] = []
 
     try:
         async with AsyncWebCrawler() as crawler:
@@ -116,12 +130,17 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
                 if href and isinstance(href, str):
                     # Strip fragments and normalize
                     clean_href = href.split("#")[0].strip()
-                    if clean_href and clean_href != start_url:
-                        internal_links.add(clean_href)
+                    if (
+                        clean_href
+                        and clean_href != start_url
+                        and clean_href not in seen
+                    ):
+                        seen.add(clean_href)
+                        ordered_links.append(clean_href)
 
             if verbose:
                 console.print_success(
-                    f"Discovery completed: {len(internal_links)} unique internal links"
+                    f"Discovery completed: {len(ordered_links)} unique internal links"
                 )
 
     except (InvalidUrlError, NetworkError):
@@ -155,16 +174,16 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
                 f"Discovery operation failed: {error_msg}", url=start_url
             ) from e
 
-    return internal_links
+    return ordered_links
 
 
 def save_links_to_file(
-    links: set[str], output_file: str, verbose: bool = False
+    links: list[str], output_file: str, verbose: bool = False
 ) -> None:
     """Save discovered links to a text file.
 
     Args:
-        links: Set of URLs to save
+        links: Ordered list of URLs to save
         output_file: Path to output file
         verbose: Enable verbose logging
     """
@@ -183,7 +202,7 @@ def save_links_to_file(
     out_path: Path = Path(output_file)
     try:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text("\n".join(sorted(links)), encoding="utf-8")
+        out_path.write_text("\n".join(links), encoding="utf-8")
         if verbose:
             console.print(f"[green][SUCCESS] Saved to {out_path}[/green]")
     except Exception as e:

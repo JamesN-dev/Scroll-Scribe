@@ -40,6 +40,9 @@ dev = [
     "pytest-mock>=3.14.1",
 ]
 
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning"]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"
