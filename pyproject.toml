@@ -1,6 +1,6 @@
 [project]
 name = "scrollscribe"
-version = "0.3.0"
+version = "0.3.1"
 description = "AI-powered documentation scraper that transforms documentation websites into clean, filtered Markdown"
 readme = "README.md"
 license = { text = "MIT" }
