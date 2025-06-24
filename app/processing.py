@@ -44,9 +44,11 @@ from rich.progress import (
 )
 from rich.text import Text
 
+from .constants import MAX_FILENAME_LENGTH, DEFAULT_EXTENSION, URL_DISPLAY_MAX_LENGTH
 from .utils.exceptions import FileIOError, LLMError, ProcessingError
 from .utils.logging import CleanConsole, get_logger
 from .utils.retry import retry_llm
+from .utils.url_helpers import clean_url_for_display
 
 # Initialize the clean logging system
 logger = get_logger("processing")
@@ -140,7 +142,7 @@ def read_urls_from_file(filepath: str) -> list[str]:
 
 
 def url_to_filename(
-    url: str, index: int, extension: str = ".md", max_len: int = 100
+    url: str, index: int, extension: str = DEFAULT_EXTENSION, max_len: int = MAX_FILENAME_LENGTH
 ) -> str:
     """Generate a safe, filesystem-friendly filename from a URL and index.
 
@@ -407,9 +409,7 @@ async def process_urls_batch(
                     url_start_time = time.time()
 
                     # Update progress bar with current URL
-                    clean_url = url.replace("https://", "").replace("http://", "")
-                    if len(clean_url) > 50:
-                        clean_url = clean_url[:47] + "..."
+                    clean_url = clean_url_for_display(url)
                     progress.update(task, current_url=clean_url)
 
                     if args.verbose:

@@ -129,7 +129,9 @@ def retry_scrollscribe_operation(
 # ------------------------------------------------------------------------------
 
 retry_llm = retry_scrollscribe_operation(
-    max_attempts=5,
+    max_attempts=3,  # 3 total attempts (2 retries) - reasonable for LLM calls
+    initial_delay_sec=1.0,  # Start with 1 second
+    max_delay_sec=10.0,  # Cap at 10 seconds, not 60
     retry_on_exceptions=[
         RateLimitError,
         LLMError,
@@ -138,7 +140,9 @@ retry_llm = retry_scrollscribe_operation(
 )
 
 retry_network = retry_scrollscribe_operation(
-    max_attempts=4,
+    max_attempts=3,  # 3 total attempts (2 retries) - reasonable for network
+    initial_delay_sec=0.5,  # Start faster for network issues
+    max_delay_sec=5.0,  # Cap at 5 seconds for network
     retry_on_exceptions=[
         NetworkError,
         LiteAPIConnectionError,

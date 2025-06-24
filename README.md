@@ -207,7 +207,7 @@ echo "MISTRAL_API_KEY=your-mistral-key" >> .env
 scribe process https://docs.example.com/ -o output/
 
 # Use a different API key variable
-scribe process https://docs.example.com/ -o output/ --api-key ANTHROPIC_API_KEY
+scribe process https://docs.example.com/ -o output/ --api-key-env ANTHROPIC_API_KEY
 ```
 
 ### Changing Models
@@ -216,7 +216,7 @@ scribe process https://docs.example.com/ -o output/ --api-key ANTHROPIC_API_KEY
 # Use a different model with its corresponding API key
 scribe process https://docs.example.com/ -o output/ \
   --model openrouter/anthropic/claude-3-haiku \
-  --api-key ANTHROPIC_API_KEY
+  --api-key-env ANTHROPIC_API_KEY
 
 # Use free model (still needs OpenRouter key)
 scribe process https://docs.example.com/ -o output/ \
@@ -301,12 +301,12 @@ scribe process https://docs.example.com/ -o output/ \
 
 # Use different API key variable
 scribe process https://docs.example.com/ -o output/ \
-  --api-key ANTHROPIC_API_KEY
+  --api-key-env ANTHROPIC_API_KEY
 
 # Combine custom model and API key variable
 scribe process https://docs.example.com/ -o output/ \
   --model openrouter/mistralai/codestral-2501 \
-  --api-key OPENROUTER_API_KEY \
+  --api-key-env OPENROUTER_API_KEY \
   --verbose
 ```
 

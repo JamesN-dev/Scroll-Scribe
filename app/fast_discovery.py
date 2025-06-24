@@ -19,6 +19,7 @@ from pathlib import Path
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 from rich.console import Console
 
+from .utils.error_classification import classify_error_type
 from .utils.exceptions import InvalidUrlError, NetworkError
 from .utils.logging import CleanConsole
 from .utils.retry import retry_network
@@ -47,8 +48,9 @@ async def extract_links_fast(start_url: str, verbose: bool = False) -> set[str]:
         return await _extract_links_async(start_url, verbose)
     except Exception as e:
         # Map unexpected errors to appropriate ScrollScribe exceptions
-        error_msg = str(e).lower()
-        if any(term in error_msg for term in ["invalid", "parse", "malformed", "url"]):
+        error_type = classify_error_type(str(e))
+
+        if error_type == "url_error":
             if verbose:
                 console.print_error(f"URL parsing failed: {e}")
             raise InvalidUrlError(
@@ -87,11 +89,10 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> set[str
                         f"Discovery operation returned failure: {error_msg}"
                     )
 
-                # Check if it's a URL-related error
-                if any(
-                    term in error_msg.lower()
-                    for term in ["invalid", "malformed", "url", "domain"]
-                ):
+                # Use unified error classification
+                error_type = classify_error_type(error_msg)
+
+                if error_type == "url_error":
                     raise InvalidUrlError(
                         f"Invalid URL format: {start_url}",
                         url=start_url,

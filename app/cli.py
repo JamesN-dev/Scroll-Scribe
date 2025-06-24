@@ -20,7 +20,7 @@ Example Usage:
     scrollscribe scrape urls.txt -o output/ --model gpt-4
 
 Environment Variables:
-    OPENROUTER_API_KEY: API key for LLM processing (required for non-fast modes)
+    DEFAULT_API_KEY_ENV: API key for LLM processing (required for non-fast modes)
     LITELLM_LOG: Set to ERROR to reduce library logging noise
 """
 
@@ -43,6 +43,13 @@ from rich.table import Table
 # Assume these are your project's modules.
 # If the structure is different, you may need to adjust the import paths.
 from .config import get_browser_config
+from .constants import (
+    DEFAULT_API_KEY_ENV,
+    DEFAULT_BASE_URL,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_TIMEOUT_MS,
+)
 from .fast_discovery import extract_links_fast, save_links_to_file
 from .fast_processing import process_urls_fast
 from .processing import process_urls_batch, read_urls_from_file
@@ -260,7 +267,7 @@ def scrape(
             help="LLM model to use for filtering.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "openrouter/mistralai/codestral-2501",
+    ] = DEFAULT_LLM_MODEL,
     api_key_env: Annotated[
         str,
         typer.Option(
@@ -268,7 +275,7 @@ def scrape(
             help="Environment variable containing the API key.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "OPENROUTER_API_KEY",
+    ] = DEFAULT_API_KEY_ENV,
     base_url: Annotated[
         str,
         typer.Option(
@@ -276,7 +283,7 @@ def scrape(
             help="API Base URL for LLM.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "https://openrouter.ai/api/v1",
+    ] = DEFAULT_BASE_URL,
     max_tokens: Annotated[
         int,
         typer.Option(
@@ -285,13 +292,13 @@ def scrape(
             help="Max output tokens for the LLM filtering.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = 8192,
+    ] = DEFAULT_MAX_TOKENS,
     timeout: Annotated[
         int,
         typer.Option(
             help="Page load timeout in milliseconds.", rich_help_panel="Browser Control"
         ),
-    ] = 60000,
+    ] = DEFAULT_TIMEOUT_MS,
     wait: Annotated[
         str,
         typer.Option(
@@ -353,7 +360,7 @@ def scrape(
       [#8ec07c]➤ Resume a large job from a specific line:[/]
         [dim]$ scribe scrape urls.txt -o output/ --start-at 150[/dim]
 
-    [bold #fe8019]Heads Up:[/bold #fe8019] LLM mode requires the [cyan]OPENROUTER_API_KEY[/] environment variable to be set.
+    [bold #fe8019]Heads Up:[/bold #fe8019] LLM mode requires the [cyan]DEFAULT_API_KEY_ENV[/] environment variable to be set.
     """
     # This logic matches your original file exactly.
     debug = ctx.obj.get("debug", False)
@@ -448,7 +455,7 @@ def process(
             help="LLM model to use for filtering.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "openrouter/mistralai/codestral-2501",
+    ] = DEFAULT_LLM_MODEL,
     api_key_env: Annotated[
         str,
         typer.Option(
@@ -456,7 +463,7 @@ def process(
             help="Environment variable containing the API key.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "OPENROUTER_API_KEY",
+    ] = DEFAULT_API_KEY_ENV,
     base_url: Annotated[
         str,
         typer.Option(
@@ -464,7 +471,7 @@ def process(
             help="API Base URL for LLM.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = "https://openrouter.ai/api/v1",
+    ] = DEFAULT_BASE_URL,
     max_tokens: Annotated[
         int,
         typer.Option(
@@ -473,13 +480,13 @@ def process(
             help="Max output tokens for the LLM filtering.",
             rich_help_panel="LLM Configuration",
         ),
-    ] = 8192,
+    ] = DEFAULT_MAX_TOKENS,
     timeout: Annotated[
         int,
         typer.Option(
             help="Page load timeout in milliseconds.", rich_help_panel="Browser Control"
         ),
-    ] = 60000,
+    ] = DEFAULT_TIMEOUT_MS,
     wait: Annotated[
         str,
         typer.Option(

@@ -14,6 +14,9 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 
+from ..constants import URL_DISPLAY_MAX_LENGTH, URL_DISPLAY_MAX_LENGTH_DETAILED
+from .url_helpers import clean_url_for_display, clean_url_for_detailed_display
+
 
 class CleanConsole:
     """Clean console output manager for ScrollScribe."""
@@ -46,11 +49,9 @@ class CleanConsole:
         """
         # Extract clean domain/path from URL
         try:
-            clean_url = url.replace("https://", "").replace("http://", "")
-            if len(clean_url) > 50:
-                clean_url = clean_url[:47] + "..."
+            clean_url = clean_url_for_display(url)
         except Exception:
-            clean_url = url[:50]
+            clean_url = url[:URL_DISPLAY_MAX_LENGTH]
 
         if status == "success":
             icon = "✅"
@@ -255,9 +256,7 @@ class CleanConsole:
             time_taken: Time taken for the operation
             progress_console: If provided, uses progress.console.log() to avoid breaking progress bars
         """
-        clean_url = url.replace("https://", "").replace("http://", "")
-        if len(clean_url) > 60:
-            clean_url = clean_url[:57] + "..."
+        clean_url = clean_url_for_detailed_display(url)
 
         if status == "fetched":
             icon = "📥"
@@ -310,7 +309,7 @@ class ScrollScribeLogger:
 
     def url_processing_start(self, url: str, index: int, total: int):
         """Log start of URL processing."""
-        clean_url = url.replace("https://", "").replace("http://", "")
+        clean_url = clean_url_for_display(url)
         self.logger.info(f"[blue]Processing[/] {index}/{total}: [link]{clean_url}[/]")
 
     def url_success(
