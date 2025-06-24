@@ -23,6 +23,7 @@ from app.utils.error_classification import classify_error_type
 from app.utils.exceptions import InvalidUrlError, NetworkError
 from app.utils.logging import CleanConsole
 from app.utils.retry import retry_network
+from app.utils.url_helpers import clean_url_for_display
 
 
 @retry_network
@@ -79,7 +80,9 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> list[st
     console = CleanConsole()
 
     if verbose:
-        console.print_phase("DISCOVERY", f"Extracting links from {start_url}")
+        console.print_phase(
+            "DISCOVERY", f"Extracting links from {clean_url_for_display(start_url)}"
+        )
 
     config = CrawlerRunConfig(
         css_selector="a[href]",

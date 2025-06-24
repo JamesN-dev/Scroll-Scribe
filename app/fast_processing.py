@@ -47,6 +47,7 @@ from rich.text import Text
 from .processing import RateColumn, absolutify_links, url_to_filename
 from .utils.exceptions import ProcessingError
 from .utils.logging import CleanConsole, get_logger
+from .utils.url_helpers import clean_url_for_display
 
 logger = get_logger("fast_processing")
 clean_console = CleanConsole()
@@ -183,7 +184,7 @@ async def process_urls_fast(
                     url_start_time = time.time()
 
                     logger.info(
-                        f"Processing URL {loop_index + 1}/{total_to_process} (Overall: {original_index}): {url}"
+                        f"Processing URL {loop_index + 1}/{total_to_process} (Overall: {original_index}): {clean_url_for_display(url)}"
                     )
 
                     try:
@@ -227,7 +228,7 @@ async def process_urls_fast(
                                 failed_count += 1
                                 failed_urls.append((url, f"save failed: {e}"))
                                 logger.error(
-                                    f"Failed to save markdown for {url} to {filepath}: {e}"
+                                    f"Failed to save markdown for {clean_url_for_display(url)} to {filepath}: {e}"
                                 )
                                 clean_console.print_url_status(
                                     url, "error", 0, "save failed"
@@ -252,7 +253,7 @@ async def process_urls_fast(
                         failed_count += 1
                         failed_urls.append((url, f"unexpected error: {exc}"))
                         logger.error(
-                            f"Unexpected error in fast processing {url}: {exc}"
+                            f"Unexpected error in fast processing {clean_url_for_display(url)}: {exc}"
                         )
 
                         if isinstance(exc, ProcessingError):

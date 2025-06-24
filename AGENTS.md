@@ -1,33 +1,40 @@
-# Agent Guidelines for Scroll-Scribe
+# Agent Guidelines for Python Projects
 
-This file serves as:
-1. Project-level instructions for Zed's built-in AI functionality (Agent Panel, inline assistant)
-2. Guidelines for CLI-based AI agents (opencode, GitHub Copilot CLI, etc.)
+This document provides general instructions and best practices for AI agents, code review bots, or automated tools working on Python projects.
 
 ## Commands
+
 - Run linting: `ruff check .`
-- Run type checking: `basedpyright .`
+- Run type checking: `basedpyright app/`
 - Run tests: `pytest`
-- Run single test: `pytest tests/test_processing.py::test_url_to_filename`
-- Run tests with coverage: `pytest --cov=app tests/`
+- Run a single test: `pytest path/to/test_file.py::test_name`
+- Run tests with coverage: `pytest --cov=your_package tests/`
 
 ## Code Style
-- Use Python type hints consistently
-- Follow PEP 8 naming: snake_case for functions/variables, PascalCase for classes
-- Structured error handling with custom exceptions in utils/exceptions.py
-- Async/await for I/O operations
-- Rich console output using CleanConsole class
-- Docstrings required for all public functions/classes
-- Relative imports within app package
-- Use f-strings for string formatting
-- Exception handling with custom exceptions (FileIOError, LLMError, ProcessingError)
-- Logging via utils/logging.py with appropriate log levels
 
-## IDE Integration
-This file is automatically recognized by Zed's AI features (as AGENTS.md) and will be included in all interactions with:
-- Zed's Agent Panel (@ai)
-- Inline assistant
-- Edit predictions
-- Other AI features in Zed
+- Use Python type hints consistently.
+- Follow PEP 8 naming conventions (snake_case for functions/variables, PascalCase for classes).
+- Write clear docstrings for all public functions and classes.
+- Prefer f-strings for string formatting.
+- Use structured error handling with custom exceptions where appropriate.
+- For I/O or long-running operations, use async/await.
+- Keep imports clean and organized (group standard, third-party, and local).
+- Use relative imports inside packages when appropriate.
+- Maintain readable, maintainable code with clear function/class boundaries.
 
-The same guidelines also apply to CLI-based AI agents working with this codebase.
+## Testing
+
+- Ensure comprehensive unit and integration test coverage.
+- Use mocks and fixtures for external dependencies.
+- Follow consistent test naming and structure.
+- Keep tests isolated and deterministic.
+
+## Logging & Output
+
+- Use consistent logging conventions with appropriate log levels.
+- Prefer reusable logging utilities or libraries.
+- Keep console output clean and user-friendly.
+
+---
+
+Agents should always run the full test suite and static analysis before making suggestions or changes.

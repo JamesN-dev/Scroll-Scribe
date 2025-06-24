@@ -89,5 +89,10 @@ exclude = [
     "data",
     "docs",
     "logs",
+    "AGENTS.md",
+    "other-docs/",
+    "tests",
+    "archive/",
+    "dist/",
 ]
 pythonVersion = "3.10"

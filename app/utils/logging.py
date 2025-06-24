@@ -14,8 +14,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 
-from ..constants import URL_DISPLAY_MAX_LENGTH, URL_DISPLAY_MAX_LENGTH_DETAILED
-from .url_helpers import clean_url_for_display, clean_url_for_detailed_display
+from ..constants import URL_DISPLAY_MAX_LENGTH
+from .url_helpers import clean_url_for_detailed_display, clean_url_for_display
 
 
 class CleanConsole:

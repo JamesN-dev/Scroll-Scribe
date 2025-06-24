@@ -55,6 +55,16 @@ from .fast_processing import process_urls_fast
 from .processing import process_urls_batch, read_urls_from_file
 from .utils.exceptions import ConfigError, FileIOError
 from .utils.logging import CleanConsole, set_logging_verbosity
+from .utils.url_helpers import clean_url_for_display
+from .utils.validation import (
+    validate_file_path,
+    validate_filename,
+    validate_model_name,
+    validate_output_directory,
+    validate_start_line,
+    validate_timeout,
+    validate_url,
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -62,6 +72,22 @@ load_dotenv()
 # --- Globals & App Initialization ---
 console = CleanConsole()
 rich_console = Console()
+
+
+def validate_and_exit_on_error(validation_func, value, param_name: str):
+    """
+    Run validation function and exit with error if validation fails.
+
+    Args:
+        validation_func: The validation function to call
+        value: The value to validate
+        param_name: Name of the parameter for error messages
+    """
+    is_valid, error_msg = validation_func(value)
+    if not is_valid:
+        rich_console.print(f"[bold red]Error:[/bold red] {param_name}: {error_msg}")
+        raise typer.Exit(1)
+
 
 app = typer.Typer(
     name="scribe",
@@ -128,7 +154,7 @@ def print_summary_report(summary: dict):
 
     if failed_items:
         failed_text = "\n".join(
-            f"• [dim]{url}[/dim]\n  [red]Reason:[/red] {error}"
+            f"• [dim]{clean_url_for_display(url)}[/dim]\n  [red]Reason:[/red] {error}"
             for url, error in failed_items
         )
         failed_panel = Panel(
@@ -211,8 +237,13 @@ def discover(
     [bold #83a598]Pro Tip:[/bold #83a598] Use the generated file as input for the '[cyan]scrape[/cyan]' command.
     """
     # This logic matches your original file exactly.
+    # Validate inputs before processing
+    validate_and_exit_on_error(validate_url, start_url, "start_url")
+
     if output_file is None:
         output_file = "urls.txt"
+
+    validate_and_exit_on_error(validate_filename, output_file, "output_file")
 
     args = argparse.Namespace(
         start_url=start_url, output_file=output_file, verbose=verbose
@@ -364,6 +395,21 @@ def scrape(
     """
     # This logic matches your original file exactly.
     debug = ctx.obj.get("debug", False)
+
+    # Validate inputs before processing
+    validate_and_exit_on_error(validate_output_directory, output_dir, "output_dir")
+    validate_and_exit_on_error(validate_start_line, start_at + 1, "start_at")
+    validate_and_exit_on_error(validate_timeout, timeout, "timeout")
+
+    # Validate model only if not using fast mode
+    if not fast:
+        validate_and_exit_on_error(validate_model_name, model, "model")
+
+    # Validate input - can be URL or file path
+    if input.startswith(("http://", "https://")):
+        validate_and_exit_on_error(validate_url, input, "input URL")
+    else:
+        validate_and_exit_on_error(validate_file_path, input, "input file")
 
     # Encapsulate the logic to avoid repetition and handle summary report
     def run_scrape(input_file_path):
@@ -578,7 +624,10 @@ async def discover_command(args: argparse.Namespace) -> int:
     # This function is identical to your original.
     console = CleanConsole()
     set_logging_verbosity(verbose=args.verbose)
-    console.print_phase("DISCOVERY", f"Finding internal links from {args.start_url}")
+    console.print_phase(
+        "DISCOVERY",
+        f"Finding internal links from {clean_url_for_display(args.start_url)}",
+    )
     console.print_info(f"Output file: {args.output_file}")
     try:
         found_urls: list[str] = await extract_links_fast(args.start_url, args.verbose)

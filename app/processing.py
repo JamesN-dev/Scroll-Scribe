@@ -44,7 +44,7 @@ from rich.progress import (
 )
 from rich.text import Text
 
-from .constants import MAX_FILENAME_LENGTH, DEFAULT_EXTENSION, URL_DISPLAY_MAX_LENGTH
+from .constants import DEFAULT_EXTENSION, MAX_FILENAME_LENGTH
 from .utils.exceptions import FileIOError, LLMError, ProcessingError
 from .utils.logging import CleanConsole, get_logger
 from .utils.retry import retry_llm
@@ -142,7 +142,10 @@ def read_urls_from_file(filepath: str) -> list[str]:
 
 
 def url_to_filename(
-    url: str, index: int, extension: str = DEFAULT_EXTENSION, max_len: int = MAX_FILENAME_LENGTH
+    url: str,
+    index: int,
+    extension: str = DEFAULT_EXTENSION,
+    max_len: int = MAX_FILENAME_LENGTH,
 ) -> str:
     """Generate a safe, filesystem-friendly filename from a URL and index.
 
