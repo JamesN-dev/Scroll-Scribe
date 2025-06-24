@@ -27,12 +27,11 @@ PLANS.md
 output/mydocs
 
 output/testes
-tests/
 REFACTOR/
 
 
 plans/
 
 archive/
-tests/
+tests/dev-test
 docs/scraped-docs
