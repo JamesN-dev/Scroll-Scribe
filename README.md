@@ -156,17 +156,41 @@ scribe process https://docs.fastapi.com/ -o fastapi-docs/
 
 ### `discover` - Find All Documentation Pages
 
-Extract just the URLs from a site (useful for manual curation):
+Extract URLs from a site with optional metadata (useful for manual curation):
 
 ```bash
-# Get list of all documentation URLs
+# Get simple list of URLs
 scribe discover https://docs.fastapi.com/ -o urls.txt
+
+# Get rich metadata with depth, keywords, and timestamps
+scribe discover https://docs.fastapi.com/ -o urls.json
+
+# Get CSV format for spreadsheet analysis
+scribe discover https://docs.fastapi.com/ -o urls.csv
+```
+
+**Output Formats:**
+- **`.txt`** - Simple URL list (default)
+- **`.csv`** - URLs in CSV format for spreadsheet import
+- **`.json`** - Rich metadata including URL depth, keywords, file paths, and discovery timestamps
+
+**JSON metadata example:**
+```json
+{
+  "url": "https://docs.fastapi.com/tutorial/first-steps/",
+  "path": "/tutorial/first-steps/",
+  "depth": 2,
+  "keywords": ["tutorial", "first", "steps"],
+  "filename_part": "tutorial/first-steps",
+  "discovered_at": "2025-06-24T19:43:27.627987"
+}
 ```
 
 **Why use discover separately?**
 
-- **Manual curation**: Edit `urls.txt` to remove pages you don't want
-- **Planning**: See how many pages before processing
+- **Manual curation**: Edit output files to remove pages you don't want
+- **Planning**: See how many pages and site structure before processing
+- **Analysis**: Use JSON metadata to understand site hierarchy and content types
 - **Selective processing**: Only download the pages you actually need
 
 ### `scrape` - Convert to Markdown

@@ -22,7 +22,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import cast
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from crawl4ai import (
     AsyncWebCrawler,
@@ -44,11 +44,10 @@ from rich.progress import (
 )
 from rich.text import Text
 
-from .constants import DEFAULT_EXTENSION, MAX_FILENAME_LENGTH
 from .utils.exceptions import FileIOError, LLMError, ProcessingError
 from .utils.logging import CleanConsole, get_logger
 from .utils.retry import retry_llm
-from .utils.url_helpers import clean_url_for_display
+from .utils.url_helpers import clean_url_for_display, url_to_filename
 
 # Initialize the clean logging system
 logger = get_logger("processing")
@@ -113,18 +112,58 @@ def read_urls_from_file(filepath: str) -> list[str]:
     urls: list[str] = []
     logger.info(f"Reading URLs from: {filepath}")
 
+    # Detect file type by extension
+    file_suffix = Path(filepath).suffix.lower()
+
     try:
         with open(filepath, encoding="utf-8") as file_object:
-            for line in file_object:
-                cleaned_line: str = line.strip()
-                if not cleaned_line:
-                    continue
-                match = re.search(r"https?://\S+", cleaned_line)
-                if match:
-                    url: str = match.group(0).rstrip(".,;:!?")
-                    urls.append(url)
-                else:
-                    logger.warning(f"Skipping invalid line: '{cleaned_line}'")
+            if file_suffix == ".csv":
+                # Handle CSV files with headers
+                import csv
+
+                csv_reader = csv.reader(file_object)
+                header = next(csv_reader, None)  # Read header row
+
+                if not header:
+                    return urls
+
+                # Find the URL column index
+                url_column_index = 0  # Default to first column
+                for i, column_name in enumerate(header):
+                    if column_name.lower() == "url":
+                        url_column_index = i
+                        break
+
+                for row in csv_reader:
+                    if not row or len(row) <= url_column_index:
+                        continue
+                    url = row[url_column_index].strip()
+                    if url:
+                        urls.append(url)
+            elif file_suffix == ".json":
+                # Handle JSON files
+                import json
+
+                content = file_object.read()
+                data = json.loads(content)
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "url" in item:
+                            urls.append(item["url"])
+                        elif isinstance(item, str):
+                            urls.append(item)
+            else:
+                # Handle text files - existing logic
+                for line in file_object:
+                    cleaned_line: str = line.strip()
+                    if not cleaned_line:
+                        continue
+                    match = re.search(r"https?://\S+", cleaned_line)
+                    if match:
+                        url: str = match.group(0).rstrip(".,;:!?")
+                        urls.append(url)
+                    else:
+                        logger.warning(f"Skipping invalid line: '{cleaned_line}'")
 
     except FileNotFoundError as err:
         logger.error(f"Input file not found: {filepath}")
@@ -141,47 +180,47 @@ def read_urls_from_file(filepath: str) -> list[str]:
     return urls
 
 
-def url_to_filename(
-    url: str,
-    index: int,
-    extension: str = DEFAULT_EXTENSION,
-    max_len: int = MAX_FILENAME_LENGTH,
-) -> str:
-    """Generate a safe, filesystem-friendly filename from a URL and index.
+# def url_to_filename(
+#     url: str,
+#     index: int,
+#     extension: str = DEFAULT_EXTENSION,
+#     max_len: int = MAX_FILENAME_LENGTH,
+# ) -> str:
+#     """Generate a safe, filesystem-friendly filename from a URL and index.
 
-    This function parses the given URL and constructs a filename that is safe for most filesystems,
-    using the URL path or netloc, sanitized and truncated as needed. The filename includes a
-    zero-padded index for ordering and the specified file extension.
+#     This function parses the given URL and constructs a filename that is safe for most filesystems,
+#     using the URL path or netloc, sanitized and truncated as needed. The filename includes a
+#     zero-padded index for ordering and the specified file extension.
 
-    Args:
-        url (str): The source URL to convert into a filename.
-        index (int): The index of the URL in the processing batch (used for ordering).
-        extension (str, optional): The file extension to use (default: ".md").
-        max_len (int, optional): Maximum length for the filename base (default: 100).
+#     Args:
+#         url (str): The source URL to convert into a filename.
+#         index (int): The index of the URL in the processing batch (used for ordering).
+#         extension (str, optional): The file extension to use (default: ".md").
+#         max_len (int, optional): Maximum length for the filename base (default: 100).
 
-    Returns:
-        str: A safe filename string suitable for saving the processed content.
+#     Returns:
+#         str: A safe filename string suitable for saving the processed content.
 
-    Notes:
-        - If the URL cannot be parsed, a fallback filename using only the index is returned.
-        - All unsafe filesystem characters are replaced with underscores.
-    """
-    try:
-        parsed = urlparse(url)
-        path_part: str = (
-            parsed.path.strip("/") if parsed.path.strip("/") else parsed.netloc
-        )
-        safe_path: str = re.sub(r'[\\/:*?"<>|]+', "_", path_part)
-        safe_path = re.sub(r"\s+", "_", safe_path)
-        safe_path = safe_path[:max_len].rstrip("._")
-        if not safe_path:
-            safe_path = f"url_{index}"
-        return f"page_{index:03d}_{safe_path}{extension}"
-    except Exception:
-        logger.error(
-            f"Failed to generate safe filename for URL index {index}. Using fallback."
-        )
-        return f"page_{index:03d}{extension}"
+#     Notes:
+#         - If the URL cannot be parsed, a fallback filename using only the index is returned.
+#         - All unsafe filesystem characters are replaced with underscores.
+#     """
+#     try:
+#         parsed = urlparse(url)
+#         path_part: str = (
+#             parsed.path.strip("/") if parsed.path.strip("/") else parsed.netloc
+#         )
+#         safe_path: str = re.sub(r'[\\/:*?"<>|]+', "_", path_part)
+#         safe_path = re.sub(r"\s+", "_", safe_path)
+#         safe_path = safe_path[:max_len].rstrip("._")
+#         if not safe_path:
+#             safe_path = f"url_{index}"
+#         return f"page_{index:03d}_{safe_path}{extension}"
+#     except Exception:
+#         logger.error(
+#             f"Failed to generate safe filename for URL index {index}. Using fallback."
+#         )
+#         return f"page_{index:03d}{extension}"
 
 
 @retry_llm

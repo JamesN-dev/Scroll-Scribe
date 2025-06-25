@@ -1,17 +1,17 @@
-"""Fast, reliable internal link discovery for documentation sites using Crawl4AI.
+"""
+Fast, reliable internal link discovery for documentation sites using Crawl4AI.
 
-Implements modern, high-performance URL discovery with browser automation and JavaScript support.
-Fetches only internal documentation links, always using fresh content (no cache, no LLM).
+Implements high-performance async URL discovery with browser automation and JavaScript support.
+Fetches only internal documentation links using fresh content (no caching, no LLM).
 
-Key features:
-- Optimized for speed and accuracy on documentation sites
-- No LLM required; always fetches live content
-- Designed for use in --fast mode and as a drop-in replacement for legacy discovery
-- Returns only internal links relevant for documentation scraping
+Supports saving discovered links as ordered lists to either:
+- Plain text files (.txt), one URL per line (default)
+- Headerless single-column CSV files (.csv), preserving discovery order
 
-Example:
-    from fast_discovery import extract_links_fast
-    links: list[str] = await extract_links_fast("https://docs.example.com/", verbose=True)
+Usage examples:
+    links = await extract_links_fast("https://docs.python.org/")
+    save_links_to_file(links, "urls.txt")          # Save as TXT (default)
+    save_links_to_file(links, "urls.csv", fmt="csv")  # Save as CSV
 """
 
 from pathlib import Path
@@ -23,7 +23,10 @@ from app.utils.error_classification import classify_error_type
 from app.utils.exceptions import InvalidUrlError, NetworkError
 from app.utils.logging import CleanConsole
 from app.utils.retry import retry_network
-from app.utils.url_helpers import clean_url_for_display
+from app.utils.url_helpers import (
+    analyze_url_metadata,
+    clean_url_for_display,
+)
 
 
 @retry_network
@@ -181,16 +184,31 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> list[st
 
 
 def save_links_to_file(
-    links: list[str], output_file: str, verbose: bool = False
+    links: list[str], output_file: str, verbose: bool = False, fmt: str = "txt"
 ) -> None:
-    """Save discovered links to a text file.
+    """Save discovered links to a file in text, JSON, or CSV format.
 
     Args:
-        links: Ordered list of URLs to save
-        output_file: Path to output file
-        verbose: Enable verbose logging
+        links: Ordered list of URLs to save.
+        output_file: Path to output file. If None and fmt="csv", defaults to "urls.csv".
+        verbose: Enable verbose logging.
+        fmt: Output format - "txt" (default) writes one URL per line,
+        "json" writes a JSON array of URLs,
+        "csv" writes a headerless single-column CSV file preserving order.
+
+    Raises:
+        ValueError: If fmt is not "txt", "json", or "csv".
+        OSError: If the file cannot be written.
+
+    Notes:
+        - When fmt is "csv" and output_file is None, the default filename "urls.csv" will be used.
+        - The function preserves the order of URLs as provided.
     """
     console = Console()
+
+    # Validate format parameter
+    if fmt not in ("txt", "json", "csv"):
+        raise ValueError(f"Format must be 'txt', 'json', or 'csv', got '{fmt}'")
 
     if not links:
         if verbose:
@@ -199,13 +217,58 @@ def save_links_to_file(
 
     if verbose:
         console.print(
-            f"\n[cyan][INFO] Found {len(links)} unique URLs. Saving...[/cyan]"
+            f"\n[cyan][INFO] Found {len(links)} unique URLs. Saving as {fmt.upper()}...[/cyan]"
         )
 
     out_path: Path = Path(output_file)
     try:
+        # Keep directory-creation unchanged
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text("\n".join(links), encoding="utf-8")
+
+        # Branch logic based on format
+        if fmt == "txt":
+            # Current behavior - join with newlines
+            out_path.write_text("\n".join(links), encoding="utf-8")
+        elif fmt == "csv":
+            import csv
+
+            with open(out_path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                # Write header
+                writer.writerow(
+                    [
+                        "url",
+                        "path",
+                        "depth",
+                        "keywords",
+                        "filename_part",
+                        "md_filename",
+                        "discovered_at",
+                    ]
+                )
+                for i, link in enumerate(links):
+                    metadata = analyze_url_metadata(link, i + 1)
+                    writer.writerow(
+                        [
+                            metadata["url"],
+                            metadata["path"],
+                            metadata["depth"],
+                            "|".join(metadata["keywords"]),  # Join keywords with |
+                            metadata["filename_part"],
+                            metadata["md_filename"],
+                            metadata["discovered_at"],
+                        ]
+                    )
+        elif fmt == "json":
+            import json
+
+            json_data = []
+            for i, link in enumerate(links):
+                metadata = analyze_url_metadata(link, i + 1)  # This line goes here
+                json_data.append(metadata)
+            with open(out_path, "w", encoding="utf-8") as jsonfile:
+                json.dump(json_data, jsonfile, indent=4)
+
         if verbose:
             console.print(f"[green][SUCCESS] Saved to {out_path}[/green]")
     except Exception as e:

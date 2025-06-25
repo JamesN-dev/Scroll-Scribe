@@ -66,7 +66,6 @@ from .utils.validation import (
     validate_url,
 )
 
-# Load environment variables from .env file
 load_dotenv()
 
 # --- Globals & App Initialization ---
@@ -201,11 +200,11 @@ def discover(
         str, typer.Argument(help="The starting URL to crawl for documentation links.")
     ],
     output_file: Annotated[
-        str | None,
+        str,
         typer.Option(
             "-o",
             "--output-file",
-            help="Output file to save discovered URLs. Defaults to 'urls.txt'.",
+            help="Output file to save discovered URLs. Extension determines format (.txt or .csv).",
         ),
     ] = "urls.txt",
     verbose: Annotated[
@@ -228,25 +227,38 @@ def discover(
       • Isolate specific sections of a large documentation site.
 
     [bold #b8bb26]Examples:[/bold #b8bb26]
+      [#8ec07c]➤ Discover and save to default text file:[/]
+        [dim]$ scribe discover https://docs.django.com/[/dim]
+
+      [#8ec07c]➤ Save in CSV format for spreadsheet analysis:[/]
+        [dim]$ scribe discover https://docs.django.com/ --csv[/dim]
+
       [#8ec07c]➤ Discover and save to a custom file:[/]
-        [dim]$ scribe discover https://docs.django.com/ -o django-urls.txt[/dim]
+        [dim]$ scribe discover https://fastapi.tiangolo.com/ -o custom-urls.txt[/dim]
 
       [#8ec07c]➤ Run with verbose output for debugging:[/]
         [dim]$ scribe discover https://fastapi.tiangolo.com/ -v[/dim]
 
     [bold #83a598]Pro Tip:[/bold #83a598] Use the generated file as input for the '[cyan]scrape[/cyan]' command.
     """
-    # This logic matches your original file exactly.
+
     # Validate inputs before processing
     validate_and_exit_on_error(validate_url, start_url, "start_url")
-
-    if output_file is None:
-        output_file = "urls.txt"
-
     validate_and_exit_on_error(validate_filename, output_file, "output_file")
 
+    # Determine format from file extension
+    if output_file.lower().endswith(".csv"):
+        fmt = "csv"
+    elif output_file.lower().endswith(".json"):
+        fmt = "json"
+    else:
+        fmt = "txt"
+
     args = argparse.Namespace(
-        start_url=start_url, output_file=output_file, verbose=verbose
+        start_url=start_url,
+        output_file=output_file,
+        verbose=verbose,
+        csv_format=(fmt == "csv"),  # Keeps backward compatibility
     )
     result = asyncio.run(discover_command(args))
     raise typer.Exit(result)
@@ -628,11 +640,27 @@ async def discover_command(args: argparse.Namespace) -> int:
         "DISCOVERY",
         f"Finding internal links from {clean_url_for_display(args.start_url)}",
     )
-    console.print_info(f"Output file: {args.output_file}")
+
+    # Determine format and display appropriate info
+    if args.output_file.lower().endswith(".csv"):
+        fmt = "csv"
+    elif args.output_file.lower().endswith(".json"):
+        fmt = "json"
+    else:
+        fmt = "txt"
+    format_desc = (
+        "JSON format"
+        if fmt == "json"
+        else "CSV format"
+        if fmt == "csv"
+        else "text format"
+    )
+    console.print_info(f"Output file: {args.output_file} ({format_desc})")
+
     try:
         found_urls: list[str] = await extract_links_fast(args.start_url, args.verbose)
         if found_urls:
-            save_links_to_file(found_urls, args.output_file, args.verbose)
+            save_links_to_file(found_urls, args.output_file, args.verbose, fmt=fmt)
             console.print_success(f"Discovery finished. Found {len(found_urls)} URLs.")
             return 0
         else:

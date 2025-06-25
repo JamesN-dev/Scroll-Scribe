@@ -1,0 +1,745 @@
+[
+    {
+        "url": "https://docs.basedpyright.com/latest/",
+        "path": "/latest/",
+        "depth": 1,
+        "keywords": [
+            "latest"
+        ],
+        "filename_part": "latest",
+        "discovered_at": "2025-06-24T19:40:54.197808"
+    },
+    {
+        "url": "https://docs.basedpyright.com/dev/",
+        "path": "/dev/",
+        "depth": 1,
+        "keywords": [
+            "dev"
+        ],
+        "filename_part": "dev",
+        "discovered_at": "2025-06-24T19:40:54.197841"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.29.4/",
+        "path": "/v1.29.4/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.29.4",
+        "discovered_at": "2025-06-24T19:40:54.197856"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.29.3/",
+        "path": "/v1.29.3/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.29.3",
+        "discovered_at": "2025-06-24T19:40:54.197873"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.29.2/",
+        "path": "/v1.29.2/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.29.2",
+        "discovered_at": "2025-06-24T19:40:54.197884"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.29.1/",
+        "path": "/v1.29.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.29.1",
+        "discovered_at": "2025-06-24T19:40:54.197896"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.29.0/",
+        "path": "/v1.29.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.29.0",
+        "discovered_at": "2025-06-24T19:40:54.197907"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.5/",
+        "path": "/v1.28.5/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.5",
+        "discovered_at": "2025-06-24T19:40:54.197918"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.4/",
+        "path": "/v1.28.4/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.4",
+        "discovered_at": "2025-06-24T19:40:54.197928"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.3/",
+        "path": "/v1.28.3/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.3",
+        "discovered_at": "2025-06-24T19:40:54.197939"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.2/",
+        "path": "/v1.28.2/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.2",
+        "discovered_at": "2025-06-24T19:40:54.197949"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.1/",
+        "path": "/v1.28.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.1",
+        "discovered_at": "2025-06-24T19:40:54.197960"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.28.0/",
+        "path": "/v1.28.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.28.0",
+        "discovered_at": "2025-06-24T19:40:54.197970"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.27.1/",
+        "path": "/v1.27.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.27.1",
+        "discovered_at": "2025-06-24T19:40:54.197981"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.27.0/",
+        "path": "/v1.27.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.27.0",
+        "discovered_at": "2025-06-24T19:40:54.197991"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.26.0/",
+        "path": "/v1.26.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.26.0",
+        "discovered_at": "2025-06-24T19:40:54.198002"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.25.0/",
+        "path": "/v1.25.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.25.0",
+        "discovered_at": "2025-06-24T19:40:54.198013"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.24.0/",
+        "path": "/v1.24.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.24.0",
+        "discovered_at": "2025-06-24T19:40:54.198024"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.23.2/",
+        "path": "/v1.23.2/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.23.2",
+        "discovered_at": "2025-06-24T19:40:54.198034"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.23.1/",
+        "path": "/v1.23.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.23.1",
+        "discovered_at": "2025-06-24T19:40:54.198044"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.23.0/",
+        "path": "/v1.23.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.23.0",
+        "discovered_at": "2025-06-24T19:40:54.198055"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.22.1/",
+        "path": "/v1.22.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.22.1",
+        "discovered_at": "2025-06-24T19:40:54.198065"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.22.0/",
+        "path": "/v1.22.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.22.0",
+        "discovered_at": "2025-06-24T19:40:54.198075"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.21.1/",
+        "path": "/v1.21.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.21.1",
+        "discovered_at": "2025-06-24T19:40:54.198086"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.21.0/",
+        "path": "/v1.21.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.21.0",
+        "discovered_at": "2025-06-24T19:40:54.198097"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.20.0/",
+        "path": "/v1.20.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.20.0",
+        "discovered_at": "2025-06-24T19:40:54.198108"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.19.1/",
+        "path": "/v1.19.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.19.1",
+        "discovered_at": "2025-06-24T19:40:54.198118"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.19.0/",
+        "path": "/v1.19.0/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.19.0",
+        "discovered_at": "2025-06-24T19:40:54.198129"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.18.4/",
+        "path": "/v1.18.4/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.18.4",
+        "discovered_at": "2025-06-24T19:40:54.198140"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.18.3/",
+        "path": "/v1.18.3/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.18.3",
+        "discovered_at": "2025-06-24T19:40:54.198151"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.18.2/",
+        "path": "/v1.18.2/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.18.2",
+        "discovered_at": "2025-06-24T19:40:54.198300"
+    },
+    {
+        "url": "https://docs.basedpyright.com/v1.18.1/",
+        "path": "/v1.18.1/",
+        "depth": 1,
+        "keywords": [],
+        "filename_part": "v1.18.1",
+        "discovered_at": "2025-06-24T19:40:54.198312"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/baseline/",
+        "path": "/latest/benefits-over-pyright/baseline/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "baseline"
+        ],
+        "filename_part": "latest/benefits-over-pyright/baseline",
+        "discovered_at": "2025-06-24T19:40:54.198322"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/better-defaults/",
+        "path": "/latest/benefits-over-pyright/better-defaults/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "better"
+        ],
+        "filename_part": "latest/benefits-over-pyright/better-defaults",
+        "discovered_at": "2025-06-24T19:40:54.198335"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/errors-on-invalid-configuration/",
+        "path": "/latest/benefits-over-pyright/errors-on-invalid-configuration/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "errors"
+        ],
+        "filename_part": "latest/benefits-over-pyright/errors-on-invalid-configuration",
+        "discovered_at": "2025-06-24T19:40:54.198348"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/fixes-for-rules/",
+        "path": "/latest/benefits-over-pyright/fixes-for-rules/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "fixes"
+        ],
+        "filename_part": "latest/benefits-over-pyright/fixes-for-rules",
+        "discovered_at": "2025-06-24T19:40:54.198361"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/improved-ci-integration/",
+        "path": "/latest/benefits-over-pyright/improved-ci-integration/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "improved"
+        ],
+        "filename_part": "latest/benefits-over-pyright/improved-ci-integration",
+        "discovered_at": "2025-06-24T19:40:54.198373"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/improved-generic-narrowing/",
+        "path": "/latest/benefits-over-pyright/improved-generic-narrowing/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "improved"
+        ],
+        "filename_part": "latest/benefits-over-pyright/improved-generic-narrowing",
+        "discovered_at": "2025-06-24T19:40:54.198386"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/improved-reportUninitializedInstanceVariable/",
+        "path": "/latest/benefits-over-pyright/improved-reportUninitializedInstanceVariable/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "improved"
+        ],
+        "filename_part": "latest/benefits-over-pyright/improved-reportUninitializedInstanceVariable",
+        "discovered_at": "2025-06-24T19:40:54.198398"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/improved-translations/",
+        "path": "/latest/benefits-over-pyright/improved-translations/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "improved"
+        ],
+        "filename_part": "latest/benefits-over-pyright/improved-translations",
+        "discovered_at": "2025-06-24T19:40:54.198409"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/language-server-improvements/",
+        "path": "/latest/benefits-over-pyright/language-server-improvements/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "language"
+        ],
+        "filename_part": "latest/benefits-over-pyright/language-server-improvements",
+        "discovered_at": "2025-06-24T19:40:54.198421"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/new-diagnostic-rules/",
+        "path": "/latest/benefits-over-pyright/new-diagnostic-rules/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "new"
+        ],
+        "filename_part": "latest/benefits-over-pyright/new-diagnostic-rules",
+        "discovered_at": "2025-06-24T19:40:54.198431"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/pylance-features/",
+        "path": "/latest/benefits-over-pyright/pylance-features/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "pylance"
+        ],
+        "filename_part": "latest/benefits-over-pyright/pylance-features",
+        "discovered_at": "2025-06-24T19:40:54.198440"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/benefits-over-pyright/pypi-package-vscode-pinning/",
+        "path": "/latest/benefits-over-pyright/pypi-package-vscode-pinning/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "benefits",
+            "over",
+            "pyright",
+            "pypi"
+        ],
+        "filename_part": "latest/benefits-over-pyright/pypi-package-vscode-pinning",
+        "discovered_at": "2025-06-24T19:40:54.198452"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/installation/command-line-and-language-server/",
+        "path": "/latest/installation/command-line-and-language-server/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "installation",
+            "command",
+            "line",
+            "and"
+        ],
+        "filename_part": "latest/installation/command-line-and-language-server",
+        "discovered_at": "2025-06-24T19:40:54.198464"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/installation/ides/",
+        "path": "/latest/installation/ides/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "installation",
+            "ides"
+        ],
+        "filename_part": "latest/installation/ides",
+        "discovered_at": "2025-06-24T19:40:54.198475"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/installation/pre-commit%20hook/",
+        "path": "/latest/installation/pre-commit%20hook/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "installation",
+            "pre",
+            "commit%20hook"
+        ],
+        "filename_part": "latest/installation/pre-commit%20hook",
+        "discovered_at": "2025-06-24T19:40:54.198487"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/configuration/command-line/",
+        "path": "/latest/configuration/command-line/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "configuration",
+            "command",
+            "line"
+        ],
+        "filename_part": "latest/configuration/command-line",
+        "discovered_at": "2025-06-24T19:40:54.198498"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/configuration/comments/",
+        "path": "/latest/configuration/comments/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "configuration",
+            "comments"
+        ],
+        "filename_part": "latest/configuration/comments",
+        "discovered_at": "2025-06-24T19:40:54.198509"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/configuration/config-files/",
+        "path": "/latest/configuration/config-files/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "configuration",
+            "config",
+            "files"
+        ],
+        "filename_part": "latest/configuration/config-files",
+        "discovered_at": "2025-06-24T19:40:54.198520"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/configuration/language-server-settings/",
+        "path": "/latest/configuration/language-server-settings/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "configuration",
+            "language",
+            "server",
+            "settings"
+        ],
+        "filename_part": "latest/configuration/language-server-settings",
+        "discovered_at": "2025-06-24T19:40:54.198532"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/getting_started/features/",
+        "path": "/latest/getting_started/features/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "getting",
+            "started",
+            "features"
+        ],
+        "filename_part": "latest/getting_started/features",
+        "discovered_at": "2025-06-24T19:40:54.198543"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/getting_started/getting-started/",
+        "path": "/latest/getting_started/getting-started/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "getting",
+            "started",
+            "getting",
+            "started"
+        ],
+        "filename_part": "latest/getting_started/getting-started",
+        "discovered_at": "2025-06-24T19:40:54.198554"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/getting_started/type-concepts/",
+        "path": "/latest/getting_started/type-concepts/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "getting",
+            "started",
+            "type",
+            "concepts"
+        ],
+        "filename_part": "latest/getting_started/type-concepts",
+        "discovered_at": "2025-06-24T19:40:54.198566"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/builtins/",
+        "path": "/latest/usage/builtins/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "builtins"
+        ],
+        "filename_part": "latest/usage/builtins",
+        "discovered_at": "2025-06-24T19:40:54.198576"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/commands/",
+        "path": "/latest/usage/commands/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "commands"
+        ],
+        "filename_part": "latest/usage/commands",
+        "discovered_at": "2025-06-24T19:40:54.198587"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/import-resolution/",
+        "path": "/latest/usage/import-resolution/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "import",
+            "resolution"
+        ],
+        "filename_part": "latest/usage/import-resolution",
+        "discovered_at": "2025-06-24T19:40:54.198599"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/import-statements/",
+        "path": "/latest/usage/import-statements/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "import",
+            "statements"
+        ],
+        "filename_part": "latest/usage/import-statements",
+        "discovered_at": "2025-06-24T19:40:54.198610"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/mypy-comparison/",
+        "path": "/latest/usage/mypy-comparison/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "mypy",
+            "comparison"
+        ],
+        "filename_part": "latest/usage/mypy-comparison",
+        "discovered_at": "2025-06-24T19:40:54.198621"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/type-concepts-advanced/",
+        "path": "/latest/usage/type-concepts-advanced/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "type",
+            "concepts",
+            "advanced"
+        ],
+        "filename_part": "latest/usage/type-concepts-advanced",
+        "discovered_at": "2025-06-24T19:40:54.198633"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/type-inference/",
+        "path": "/latest/usage/type-inference/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "type",
+            "inference"
+        ],
+        "filename_part": "latest/usage/type-inference",
+        "discovered_at": "2025-06-24T19:40:54.198644"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/type-stubs/",
+        "path": "/latest/usage/type-stubs/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "type",
+            "stubs"
+        ],
+        "filename_part": "latest/usage/type-stubs",
+        "discovered_at": "2025-06-24T19:40:54.198655"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/usage/typed-libraries/",
+        "path": "/latest/usage/typed-libraries/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "usage",
+            "typed",
+            "libraries"
+        ],
+        "filename_part": "latest/usage/typed-libraries",
+        "discovered_at": "2025-06-24T19:40:54.198666"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/development/contributing/",
+        "path": "/latest/development/contributing/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "development",
+            "contributing"
+        ],
+        "filename_part": "latest/development/contributing",
+        "discovered_at": "2025-06-24T19:40:54.198677"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/development/internals/",
+        "path": "/latest/development/internals/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "development",
+            "internals"
+        ],
+        "filename_part": "latest/development/internals",
+        "discovered_at": "2025-06-24T19:40:54.198688"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/development/localization/",
+        "path": "/latest/development/localization/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "development",
+            "localization"
+        ],
+        "filename_part": "latest/development/localization",
+        "discovered_at": "2025-06-24T19:40:54.198699"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/development/upstream/",
+        "path": "/latest/development/upstream/",
+        "depth": 3,
+        "keywords": [
+            "latest",
+            "development",
+            "upstream"
+        ],
+        "filename_part": "latest/development/upstream",
+        "discovered_at": "2025-06-24T19:40:54.198710"
+    },
+    {
+        "url": "https://docs.basedpyright.com/latest/shoutouts/",
+        "path": "/latest/shoutouts/",
+        "depth": 2,
+        "keywords": [
+            "latest",
+            "shoutouts"
+        ],
+        "filename_part": "latest/shoutouts",
+        "discovered_at": "2025-06-24T19:40:54.198720"
+    },
+    {
+        "url": "http://basedpyright.com",
+        "path": "",
+        "depth": 0,
+        "keywords": [],
+        "filename_part": "basedpyright.com",
+        "discovered_at": "2025-06-24T19:40:54.198732"
+    }
+]
