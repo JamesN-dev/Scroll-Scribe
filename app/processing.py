@@ -44,12 +44,12 @@ from rich.progress import (
 )
 from rich.text import Text
 
+from .constants import DEFAULT_EXTENSION, MAX_FILENAME_LENGTH, URL_DISPLAY_MAX_LENGTH
 from .utils.exceptions import FileIOError, LLMError, ProcessingError
 from .utils.logging import CleanConsole, get_logger
 from .utils.retry import retry_llm
-from .utils.url_helpers import clean_url_for_display, url_to_filename
+from .utils.url_helpers import clean_url_for_display
 
-# Initialize the clean logging system
 logger = get_logger("processing")
 clean_console = CleanConsole()  # This handles noisy library silencing
 

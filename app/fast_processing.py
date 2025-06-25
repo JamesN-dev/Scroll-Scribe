@@ -44,7 +44,8 @@ from rich.progress import (
 from rich.rule import Rule
 from rich.text import Text
 
-from .processing import RateColumn, absolutify_links, url_to_filename
+from .processing import RateColumn, absolutify_links
+from .utils.url_helpers import url_to_filename
 from .utils.exceptions import ProcessingError
 from .utils.logging import CleanConsole, get_logger
 from .utils.url_helpers import clean_url_for_display
