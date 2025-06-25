@@ -5,11 +5,11 @@
 <h1 align="center">ScrollScribe</h1>
 
 <p align="center">
-  <strong>Convert any documentation website into clean, searchable Markdown files.</strong>
+  <strong>CLI toolkit for ML engineers, developers, data scientists, and researchers.</strong>
 </p>
 
 <p align="center">
-  Turn weeks of documentation research into hours of productive development with a powerful Python CLI.
+  Extract docs to Markdown • Generate rich CSV/JSON metadata • Prepare data for vector databases
 </p>
 
 <p align="center">
@@ -19,32 +19,47 @@
   <a href="https://github.com/tiangolo/typer">
     <img src="https://img.shields.io/badge/CLI-Typer-orange?style=for-the-badge&logo=python&logoColor=white" alt="Built with Typer">
   </a>
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
+  </a>
   <a href="https://github.com/JamesN-dev/Scroll-Scribe/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License">
   </a>
 </p>
 
 <p align="center">
+  <a href="#the-toolkit">Toolkit</a> |
   <a href="#what-scrollscribe-does">Features</a> |
   <a href="#installation">Installation</a> |
   <a href="#quick-start">Quick Start</a> |
   <a href="#processing-modes">Processing Modes</a> |
   <a href="#commands">Commands</a> |
-  <a href="#common-examples">Examples</a> |
   <a href="#troubleshooting">FAQ</a>
 </p>
 
 ---
 
-With ScrollScribe, you can build your own docs library in minutes. Automatically discover all pages on a documentation site and convert them to clean Markdown files—perfect for AI agents, custom search systems, or offline documentation.
+With ScrollScribe, you can build your own docs library in minutes. Automatically discover all pages on a documentation site and convert them to clean Markdown files—perfect for agentic workflows, custom search systems, or offline documentation.
 
 ---
 
-_Supports both fast and AI-powered (LLM) conversion modes for the best results._
+## The Toolkit
+
+### `discover` - URL Extraction + Metadata
+
+Extract URLs with rich metadata (keywords, depth, timestamps) exported as TXT, CSV, or JSON.
+
+### `scrape` - Page Processing
+
+Process single pages or URL lists. Choose fast mode (500+ pages/min) or LLM mode (publication-ready Markdown).
+
+### `process` - Unified Pipeline
+
+Point and go: discover + scrape in one command. Fast for bulk extraction, LLM for high-quality output.
 
 ---
 
-## ⚡ Two Processing Modes
+## ⚡ Processing Modes
 
 ### Fast Mode (`--fast`)
 
@@ -58,12 +73,18 @@ _Supports both fast and AI-powered (LLM) conversion modes for the best results._
 
 ## What ScrollScribe Does
 
-1. **Discovers** all documentation pages from a starting URL
-2. **Downloads** the content from each page
-3. **Converts** HTML to clean Markdown using AI or fast processing
-4. **Saves** each page as a separate `.md` file
+1. **Discovers** URLs from documentation sites with rich metadata (keywords, depth, timestamps) - export as TXT, CSV, or JSON
+2. **Processes** single pages or entire URL lists - choose fast mode (500+ pages/min) or LLM mode for publication-quality output
+3. **Converts** HTML to clean Markdown with preserved formatting, code blocks, and working links
+4. **Outputs** structured data perfect for AI agents, vector databases, or offline documentation
 
-**Example:** Point it at `https://docs.fastapi.com/` and get 200+ clean Markdown files covering the entire FastAPI documentation.
+**Examples:**
+
+- `scribe discover docs.fastapi.com -o urls.json` → Get 200+ URLs with metadata for analysis
+- `scribe process docs.fastapi.com -o fastapi-docs/` → Get 200+ clean Markdown files
+- `scribe scrape single-page.html -o output/` → Process just one page
+
+---
 
 ## Installation
 
@@ -74,10 +95,6 @@ uv sync  # or pip install -r requirements.txt
 ```
 
 ---
-
-## 🛠️ Building & Publishing
-
-This project uses [Hatch](https://hatch.pypa.io/) for building and publishing. Contributors should have it installed.
 
 ## Quick Start
 
@@ -170,11 +187,13 @@ scribe discover https://docs.fastapi.com/ -o urls.csv
 ```
 
 **Output Formats:**
+
 - **`.txt`** - Simple URL list (default)
-- **`.csv`** - URLs in CSV format for spreadsheet import
-- **`.json`** - Rich metadata including URL depth, keywords, file paths, and discovery timestamps
+- **`.csv`** - Rich metadata in spreadsheet format with columns for depth, keywords, timestamps, and filenames
+- **`.json`** - Same rich metadata as structured objects for programming
 
 **JSON metadata example:**
+
 ```json
 {
   "url": "https://docs.fastapi.com/tutorial/first-steps/",
@@ -349,14 +368,11 @@ output/
 ├── python-docs/
 │   ├── index.md                # Homepage
 │   ├── getting-started.md      # Getting started guide
-│   ├── api-reference-users.md  # API reference pages
 │   ├── ...                     # Other pages
 ├── javascript-docs/
-│   ├── index.md
-│   └── ...
-└── go-docs/
     ├── index.md
     └── ...
+
 ```
 
 Each file contains:
@@ -367,28 +383,6 @@ Each file contains:
 - Original page title as the filename
 
 This flexible structure makes it easy to build your own docs library, organize by project or language, and prepare for **future features like serving docs with an MCP server**.
-
-## Common Examples
-
-### Popular Documentation Sites
-
-```bash
-# Python libraries
-scribe process https://docs.pydantic.dev/ -o pydantic-docs/
-scribe process https://docs.sqlalchemy.org/ -o sqlalchemy-docs/
-
-# Web frameworks
-scribe process https://docs.djangoproject.com/ -o django-docs/
-scribe process https://nextjs.org/docs -o nextjs-docs/
-
-# Cloud services
-scribe process https://docs.aws.amazon.com/s3/ -o aws-s3-docs/
-scribe process https://cloud.google.com/docs/apis -o gcp-docs/
-
-# Dev tools
-scribe process https://docs.docker.com/ -o docker-docs/
-scribe process https://kubernetes.io/docs/ -o k8s-docs/
-```
 
 ### Large Sites (Use Fast Mode)
 
@@ -433,13 +427,6 @@ scribe process https://slow-site.com/ -o output/ --timeout 120000
 scribe process https://site.com/ -o output/ --verbose
 ```
 
-## Performance Tips
-
-- **Use `--fast` for large sites** (1000+ pages) to avoid API costs
-- **Use AI mode for quality** when you need clean, well-formatted output
-- **Process in chunks** using `--start-at` for very large sites
-- **Set longer timeouts** for slow or heavy documentation sites
-
 ## What's Different About ScrollScribe
 
 Unlike simple web scrapers, ScrollScribe:
@@ -459,10 +446,14 @@ Found a bug or want to add a feature?
 3. Make your changes
 4. Submit a pull request
 
+### Building & Publishing
+
+This project uses [Hatch](https://hatch.pypa.io/) for building and publishing. Contributors should have it installed.
+
 ## License
 
 MIT License - use ScrollScribe for any purpose, commercial or personal.
 
 ---
 
-**ScrollScribe** - Turn any documentation site into clean, searchable Markdown files.
+**ScrollScribe** - Turn any documentation site into clean Markdown files or structured metadata for AI processing.
