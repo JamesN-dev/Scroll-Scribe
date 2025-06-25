@@ -1,3 +1,11 @@
+## v0.4.0 (2025-06-24)
+
+### Feat
+
+- **discover**: implement CSV and JSON discover command outputs with rich CSV & JSON metadata for ML ingestion
+- integrate URL display consistency and CLI validation
+- output order list tests passing, update fast_discovery and cli
+
 ## v0.3.1 (2025-06-24)
 
 ### Fix
