@@ -1,14 +1,16 @@
-"""
-Unit tests for fast_discovery module.
+
+"""Unit tests for fast_discovery module.
 
 Tests the extract_links_fast and save_links_to_file functions with focus on:
 - Order preservation in returned URLs
 - Deduplication behavior
 - Proper list[str] return type
-- File I/O operations with proper cleanup
+- File I/O operations with proper cleanup for TXT, CSV, and JSON formats.
 """
 
 import asyncio
+import csv
+import json
 import os
 import sys
 import tempfile
@@ -233,6 +235,132 @@ class TestFastDiscovery(unittest.TestCase):
                 Path(temp_filename).unlink()
             except OSError:
                 pass
+
+    @patch("app.fast_discovery.analyze_url_metadata")
+    def test_save_links_to_file_json_format(self, mock_analyze_metadata):
+        """Test save_links_to_file with JSON format."""
+        # Configure the mock to return different metadata for each URL
+        mock_analyze_metadata.side_effect = [
+            {
+                "url": self.test_urls[0],
+                "path": "/page1",
+                "depth": 1,
+                "keywords": ["page1"],
+                "filename_part": "page1",
+                "md_filename": "001_page1.md",
+                "discovered_at": "2025-01-01T00:00:00",
+            },
+            {
+                "url": self.test_urls[1],
+                "path": "/page2",
+                "depth": 1,
+                "keywords": ["page2"],
+                "filename_part": "page2",
+                "md_filename": "002_page2.md",
+                "discovered_at": "2025-01-01T00:00:00",
+            },
+            {
+                "url": self.test_urls[2],
+                "path": "/page3",
+                "depth": 1,
+                "keywords": ["page3"],
+                "filename_part": "page3",
+                "md_filename": "003_page3.md",
+                "discovered_at": "2025-01-01T00:00:00",
+            },
+        ]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_filename = temp_file.name
+
+        try:
+            save_links_to_file(
+                self.test_urls, temp_filename, verbose=False, fmt="json"
+            )
+
+            with open(temp_filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            self.assertIsInstance(data, list)
+            self.assertEqual(len(data), len(self.test_urls))
+            self.assertEqual(data[0]["url"], self.test_urls[0])
+            self.assertEqual(data[1]["path"], "/page2")
+            self.assertEqual(data[2]["keywords"], ["page3"])
+
+        finally:
+            try:
+                Path(temp_filename).unlink()
+            except OSError:
+                pass
+
+    @patch("app.fast_discovery.analyze_url_metadata")
+    def test_save_links_to_file_csv_format(self, mock_analyze_metadata):
+        """Test save_links_to_file with CSV format."""
+        mock_analyze_metadata.side_effect = [
+            {
+                "url": self.test_urls[0],
+                "path": "/page1",
+                "depth": 1,
+                "keywords": ["page1", "key"],
+                "filename_part": "page1",
+                "md_filename": "001_page1.md",
+                "discovered_at": "2025-01-01T00:00:00",
+            },
+            {
+                "url": self.test_urls[1],
+                "path": "/page2",
+                "depth": 1,
+                "keywords": ["page2"],
+                "filename_part": "page2",
+                "md_filename": "002_page2.md",
+                "discovered_at": "2025-01-01T00:00:00",
+            },
+        ]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", newline="", suffix=".csv", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_filename = temp_file.name
+
+        try:
+            # Using first two URLs for this test
+            save_links_to_file(
+                self.test_urls[:2], temp_filename, verbose=False, fmt="csv"
+            )
+
+            with open(temp_filename, "r", newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                header = next(reader)
+                rows = list(reader)
+
+            expected_header = [
+                "url",
+                "path",
+                "depth",
+                "keywords",
+                "filename_part",
+                "md_filename",
+                "discovered_at",
+            ]
+            self.assertEqual(header, expected_header)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0][0], self.test_urls[0])
+            self.assertEqual(rows[0][3], "page1|key")  # Check keyword joining
+            self.assertEqual(rows[1][0], self.test_urls[1])
+            self.assertEqual(rows[1][3], "page2")
+
+        finally:
+            try:
+                Path(temp_filename).unlink()
+            except OSError:
+                pass
+
+    def test_save_links_to_file_invalid_format(self):
+        """Test save_links_to_file with an invalid format raises ValueError."""
+        with self.assertRaises(ValueError):
+            save_links_to_file(self.test_urls, "test.txt", fmt="xml")
 
 
 class TestFastDiscoveryIntegration(unittest.TestCase):

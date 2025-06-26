@@ -116,27 +116,30 @@ ScrollScribe/
 
 ### 4. Config File System & User Configuration
 
-- [ ] Create `ConfigManager` class in `app/config.py` for user configuration
-    - Support JSON config files (e.g., `scribe_config.json`)
-    - Load defaults from config file if present
-    - Allow CLI flags to override config values
-    - Add config validation
-- [ ] Integrate config system with new Typer CLI
-    - Use config values as Typer command defaults
-    - Maintain CLI flag override capability
-- [ ] Document config file format and usage in README
+- [ ] **Create `ConfigManager` class in `app/config.py` for user configuration**
+    - Support a single, unified `scribe_config.json` file in the user's working directory.
+    - The config structure will be simplified, removing the redundant `process` section. `scrape` settings will be the single source of truth.
+    - Load defaults from the config file if present.
+    - Allow CLI flags to override any config file values, ensuring scriptability.
+    - Implement validation to ensure the loaded configuration is sound.
+- [ ] **Integrate `ConfigManager` with the Typer CLI**
+    - Use values from `scribe_config.json` as the defaults for all Typer command options.
+    - Ensure the CLI override precedence is strictly maintained.
+- [ ] **Document the `scribe_config.json` format and usage in the README**
 
 ---
 
-### 5. Interactive Config Wizard
+### 5. Interactive Config Wizard & Direct Edit Command
 
-- [ ] Add `scribe config` command using [Questionary](https://github.com/tmbo/questionary)
-    - Interactive prompts for: **output directory**, model, timeout, wait, and other key options
-    - **Tip:** Wizard should recommend separate folders for each docs set (language, project, version)
-    - Save selections to config file
-    - Validate and test saved config
-- [ ] Build on top of Typer CLI foundation
-- [ ] Ensure wizard works with existing config file system
+- [ ] **Implement a smart `scribe config` command**
+    - If `scribe_config.json` does not exist, the command will launch an interactive wizard (`questionary`) to guide the user through initial setup.
+    - If the file *does* exist, the wizard will load the current settings and present them as defaults for each prompt, allowing for fast, safe edits of single values.
+    - The wizard will save all selections to `scribe_config.json` in the current directory.
+- [ ] **Add a `scribe config --edit` command for power users**
+    - This command will open `scribe_config.json` in the user's default editor (`$EDITOR`).
+    - **Crucially**, after the editor is closed, the command will immediately attempt to load and validate the file's JSON syntax.
+    - If validation fails, it will inform the user of the syntax error and advise them to run the command again to fix it.
+    - This provides a fast editing path while mitigating the risk of silent configuration errors.
 
 ---
 
@@ -165,28 +168,29 @@ ScrollScribe/
 
 ### 7. Testing & Validation
 
-- [ ] Test interactive wizard and config file workflow (beginner and advanced flows)
-- [ ] Test CLI-only usage (no Questionary dependency required for headless/CI)
-- [ ] Validate progress bar and status UI under heavy logging and edge cases
-- [ ] Solicit feedback from users on UX improvements
+- [ ] Test the interactive wizard (`scribe config`) for both initial setup and editing workflows.
+- [ ] Test the direct edit command (`scribe config --edit`), including the post-edit validation for both valid and invalid JSON.
+- [ ] Test the CLI-only usage to ensure it remains fully scriptable and CI-friendly.
+- [ ] Validate that CLI flags correctly override settings from the config file.
+- [ ] Solicit feedback from users on the new configuration experience.
 
 ---
 
 ## 🏆 Success Criteria
 
-- Users can configure ScrollScribe interactively or via CLI/config file, with no loss of scriptability
-- CLI help and error output is visually appealing and easy to navigate
-- ✅ **ACHIEVED**: Progress bar and status UI are persistent, adaptive, and never break due to logging or terminal size
-- ✅ **ACHIEVED**: All improvements are documented and tested (comprehensive `LOGGING.md` guide created)
+- Users can configure ScrollScribe via a safe, interactive wizard or a direct edit command, with no loss of scriptability.
+- CLI help and error output is visually appealing and easy to navigate.
+- ✅ **ACHIEVED**: Progress bar and status UI are persistent, adaptive, and never break due to logging or terminal size.
+- ✅ **ACHIEVED**: All improvements are documented and tested (comprehensive `LOGGING.md` guide created).
 
 ---
 
 ## 💡 Implementation Notes
 
-- Use Questionary only in the config wizard; all other commands should work without it
-- Prefer Rich’s adaptive UI components over static lines for cross-platform compatibility
-- Consider backward compatibility for existing users/scripts
-- Keep dependencies minimal and well-documented
+- Use Questionary only in the `scribe config` wizard; all other commands should work without it.
+- Prefer Rich’s adaptive UI components over static lines for cross-platform compatibility.
+- Consider backward compatibility for existing users/scripts.
+- Keep dependencies minimal and well-documented.
 
 ---
 
@@ -204,9 +208,9 @@ ScrollScribe/
 
 **Next Priority Tasks:**
 
-1. **Config File System** - Implement JSON config loading and CLI override
-2. **Interactive Config Wizard** - Add `scribe config` command with Questionary
-3. **Testing & Validation** - Ensure complete workflow works end-to-end
+1.  **Config File System** - Implement the `ConfigManager` in `app/config.py` to handle loading, validation, and CLI overrides for `scribe_config.json`.
+2.  **Hybrid Config Command** - Implement the `scribe config` command with its dual-purpose wizard and the `scribe config --edit` flag for direct, validated editing.
+3.  **Testing & Validation** - Ensure the complete configuration workflow is robust, user-friendly, and fully tested.
 
 **Recently Completed:**
 - ✅ **Typer Migration** - Modern CLI with Gruvbox-themed help
