@@ -19,7 +19,7 @@ from pathlib import Path
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig
 from rich.console import Console
 
-from app.utils.error_classification import classify_error_type
+from app.utils.error_classification import classify_error_type, should_retry_error
 from app.utils.exceptions import InvalidUrlError, NetworkError
 from app.utils.logging import CleanConsole
 from app.utils.retry import retry_network
@@ -110,8 +110,21 @@ async def _extract_links_async(start_url: str, verbose: bool = False) -> list[st
                     )
 
                 # Use unified error classification
-                error_type = classify_error_type(error_msg)
+                # If this error is not retryable, raise immediately (bypass retry decorator)
+                if not should_retry_error(error_msg):
+                    error_type = classify_error_type(error_msg)
+                    if error_type == "url_error":
+                        raise InvalidUrlError(
+                            f"Invalid URL format: {start_url}",
+                            url=start_url,
+                            parse_error=error_msg,
+                        ) from None
+                    else:
+                        raise NetworkError(
+                            f"Discovery operation failed: {error_msg}", url=start_url
+                        ) from None
 
+                error_type = classify_error_type(error_msg)
                 if error_type == "url_error":
                     raise InvalidUrlError(
                         f"Invalid URL format: {start_url}",
